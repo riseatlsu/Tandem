@@ -77,7 +77,7 @@ export interface ConveyorDef {
   runOutput: string; // output name that runs the belt
   sensorInput: string; // input set true when a part waits at the end
   colorInput?: string; // optional input reporting the color at the sensor
-  spawn: { intervalSec: number; jitterSec: number; count: number; colors: string[]; size: [number, number, number]; kind: string; shape?: 'box' | 'cylinder' };
+  spawn: { intervalSec: number; jitterSec: number; count: number; colors: string[]; size: [number, number, number]; kind: string; shape?: 'box' | 'cylinder'; prefill?: boolean };
 }
 export interface SceneDef {
   id: string;

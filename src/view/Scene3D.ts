@@ -8,6 +8,7 @@ import type { FixtureDef, ObjState, SceneDef, Target } from '../sim/types';
 import { poseToM4 } from '../sim/kinematics/arm';
 import { apply, col, pos, type M4 } from '../sim/math/mat4';
 import { RobotVisual, glossy } from './robotVisual';
+import { ghostEnded, onGhost, sampleGhost, type GhostClip } from './ghost';
 
 export const COLOR_NAMES: Record<string, string> = {
   red: '#ef4b5f', green: '#36c25a', blue: '#2d8cf0', yellow: '#f8c630', orange: '#ff8a2a', purple: '#9b6bff', white: '#f4f6f8', black: '#2a3038',
@@ -89,6 +90,10 @@ export class Scene3D {
   private raf = 0;
   private lastT = performance.now();
   private targetsKey = '';
+  private ghost: RobotVisual | null = null;
+  private ghostClip: GhostClip | null = null;
+  private ghostT = 0;
+  private offGhost: () => void;
   /** exposed for E2E hand-guide simulation */
   cbForTests: Scene3DCallbacks;
 
@@ -175,6 +180,7 @@ export class Scene3D {
       (this.tcpMarker.material as THREE.MeshBasicMaterial).color.set(ok ? '#2fb84a' : '#ef4b5f');
     });
 
+    this.offGhost = onGhost((clip) => { this.ghostClip = clip && clip.frames.length ? clip : null; this.ghostT = 0; if (this.ghost) this.ghost.group.visible = !!this.ghostClip; });
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(host);
     this.resize();
@@ -200,8 +206,23 @@ export class Scene3D {
     this.camera.updateProjectionMatrix();
   }
 
+  /** Pause rendering (e.g. when scrolled out of view on the landing page). */
+  paused = false;
+  /** Landing-page mode: no zoom/pan (the page scrolls), slow auto-orbit, no TCP marker or target frames. */
+  private showcase = false;
+  setShowcase() {
+    this.showcase = true;
+    this.controls.enableZoom = false;
+    this.controls.enablePan = false;
+    this.controls.autoRotate = true;
+    this.controls.autoRotateSpeed = 0.5;
+    this.tcpMarker.visible = false;
+    this.targetGroup.visible = false;
+  }
+
   private loop = () => {
     this.raf = requestAnimationFrame(this.loop);
+    if (this.paused) { this.lastT = performance.now(); return; }
     const now = performance.now();
     const dt = Math.min(0.1, (now - this.lastT) / 1000);
     this.lastT = now;
@@ -378,6 +399,7 @@ export class Scene3D {
       if (cam) {
         this.camera.position.set(...(cam.position.map(mm) as [number, number, number]));
         this.controls.target.set(...(cam.target.map(mm) as [number, number, number]));
+        if (this.showcase) { this.controls.target.z += 0.12; this.camera.position.lerpVectors(this.controls.target, this.camera.position, 1.3); }
       }
       this.lastSimTime = sim.simTime;
     }
@@ -390,6 +412,7 @@ export class Scene3D {
     const s = sim.s;
     const held = s.holding ? s.objects.find((o) => o.id === s.holding!.id) : null;
     const f = this.robot.update(s.q, s.gripperOpen, held ? Math.min(held.size[0], held.size[1]) : null, dt);
+    this.syncGhost(sim, dt);
 
     // objects
     const seen = new Set<string>();
@@ -449,6 +472,24 @@ export class Scene3D {
     }
   }
 
+  /** Replays a recorded dry run on a translucent arm, then hides it. */
+  private syncGhost(sim: SimCore, dt: number) {
+    const clip = this.ghostClip;
+    if (!clip) return;
+    if (!this.ghost || this.ghost.group.userData.arm !== sim.arm.id) {
+      if (this.ghost) { this.scene.remove(this.ghost.group); this.ghost.dispose(); }
+      this.ghost = new RobotVisual(sim.arm, { ghost: true });
+      this.ghost.group.userData.arm = sim.arm.id;
+      this.scene.add(this.ghost.group);
+    }
+    this.ghost.group.visible = true;
+    this.ghostT += dt * clip.speed;
+    const end = clip.frames[clip.frames.length - 1].t;
+    const fr = sampleGhost(clip.frames, this.ghostT);
+    this.ghost.update(fr.q, fr.open, null, dt);
+    if (this.ghostT > end + 0.8) { this.ghostClip = null; this.ghost.group.visible = false; ghostEnded(); }
+  }
+
   resetCamera(scene: SceneDef) {
     const cam = scene.camera;
     if (!cam) return;
@@ -458,6 +499,8 @@ export class Scene3D {
 
   dispose() {
     cancelAnimationFrame(this.raf);
+    this.offGhost();
+    this.ghost?.dispose();
     this.ro.disconnect();
     this.tc.dispose();
     this.controls.dispose();

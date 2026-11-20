@@ -18,7 +18,7 @@ const SceneZ = z.object({
   io: z.object({ inputs: z.array(z.object({ name: z.string(), initial: z.union([z.boolean(), z.string()]) })), outputs: z.array(z.object({ name: z.string(), initial: z.union([z.boolean(), z.string()]) })) }),
   conveyors: z.array(z.object({
     id: z.string(), start: V3Z, end: V3Z, speed: z.number(), runOutput: z.string(), sensorInput: z.string(), colorInput: z.string().optional(),
-    spawn: z.object({ intervalSec: z.number(), jitterSec: z.number(), count: z.number(), colors: z.array(z.string()), size: V3Z, kind: z.string(), shape: z.enum(['box', 'cylinder']).optional() }),
+    spawn: z.object({ intervalSec: z.number(), jitterSec: z.number(), count: z.number(), colors: z.array(z.string()), size: V3Z, kind: z.string(), shape: z.enum(['box', 'cylinder']).optional(), prefill: z.boolean().optional() }),
   })),
   sceneTargets: z.record(z.string(), PoseZ),
   colorSensors: z.array(z.object({ input: z.string(), region: z.string() })).optional(),
@@ -42,7 +42,12 @@ export type TaskDef = Omit<z.infer<typeof TaskZ>, 'predicates' | 'presetTargets'
 const ExperimentZ = z.object({
   id: z.string(), version: z.string(),
   conditions: z.record(z.string(), z.object({
-    agent: z.object({ mode: z.enum(['off', 'qa', 'suggest']), model: z.string().optional(), promptVersion: z.string() }),
+    agent: z.object({
+      mode: z.enum(['off', 'qa', 'suggest']), model: z.string().optional(), promptVersion: z.string(),
+      // AI-partner features for this condition; anything left out is off
+      features: z.object({ visuals: z.boolean().default(false), plans: z.boolean().default(false), preview: z.boolean().default(false) }).partial().optional(),
+    }),
+    tour: z.boolean().optional(),
     taskSequence: z.array(z.string()),
   })),
   assignment: z.literal('byCode'),

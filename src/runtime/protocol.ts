@@ -14,6 +14,8 @@ export type WorkerToMain =
   | { t: 'done' }
   | { t: 'error'; message: string; line?: number; fault?: Fault };
 
+/** One sample of robot motion recorded during a dry run (simulated seconds from the start of the run). */
+export interface GhostFrame { t: number; q: number[]; open: boolean }
 export interface TraceEntry { simTime: number; line?: number; blockId?: string; cmd: RobotCommand; result: 'ok' | Fault }
 export interface RunTrace {
   runId: string;
@@ -26,6 +28,7 @@ export interface RunTrace {
   fault?: Fault;
   predicates: PredicateResult[];
   simDurationSec: number;
+  frames?: GhostFrame[];
 }
 
 export function hashString(s: string): string {

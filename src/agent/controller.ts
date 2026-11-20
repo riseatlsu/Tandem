@@ -1,5 +1,8 @@
 import { HumanMessage, type BaseMessage, type AIMessage } from '@langchain/core/messages';
-import { useApp, type ChatMsg, type Proposal, updateWorkspace, currentWorkspace } from '../store';
+import { useApp, ALL_FEATURES, NO_FEATURES, type AgentFeatures, type ChatMsg, type PlanCheck, type Proposal, updateWorkspace, currentWorkspace } from '../store';
+import { clipById } from './clips';
+import { planSummary } from './plans';
+import { playGhost } from '../view/ghost';
 import { host } from '../simHost';
 import { ARMS, TASKS, sceneForTask } from '../content';
 import { SimCore } from '../sim/SimCore';
@@ -11,7 +14,7 @@ import { makeTools, type AgentBridge } from './tools';
 import { makeModel } from './llm';
 import { runAgentTurn } from './graph';
 import { runJsonProtocolTurn } from './jsonProtocol';
-import { PROMPT_VERSION, systemPrompt } from './prompts/system.v1';
+import { PROMPT_VERSION, systemPrompt } from './prompts/system.v2';
 import { getIdToken } from '../firebase';
 import { logEvent } from '../study/logger';
 import { CONFIG } from '../config';
@@ -25,11 +28,16 @@ const nid = () => `m${Date.now().toString(36)}${(++msgId).toString(36)}`;
 
 export const agentMode = () => { const s = useApp.getState(); return s.mode === 'study' ? s.study?.agentMode ?? 'off' : 'suggest'; };
 export const activeModel = () => { const s = useApp.getState(); return s.mode === 'study' ? s.study?.model ?? 'gpt-5-mini' : s.demoModel; };
+export const agentFeatures = (): AgentFeatures => { const s = useApp.getState(); return s.mode === 'study' ? s.study?.features ?? NO_FEATURES : ALL_FEATURES; };
 export const agentConfigured = () => !!CONFIG.llmProxyUrl;
 
 function pushMsg(m: ChatMsg) {
   useApp.getState().set((s) => ({ chats: { ...s.chats, [s.taskId]: [...(s.chats[s.taskId] ?? []), m] } }));
 }
+/** Visuals/plans made by a tool are shown after that tool's status pill (flushed in onToolEnd). */
+let pendingVisuals: ChatMsg[] = [];
+function pushVisual(m: ChatMsg) { pendingVisuals.push(m); }
+function flushVisuals() { const q = pendingVisuals; pendingVisuals = []; q.forEach(pushMsg); }
 function patchMsg(id: string, p: Partial<ChatMsg> | ((m: ChatMsg) => Partial<ChatMsg>)) {
   useApp.getState().set((s) => ({ chats: { ...s.chats, [s.taskId]: (s.chats[s.taskId] ?? []).map((m) => (m.id === id ? { ...m, ...(typeof p === 'function' ? p(m) : p) } : m)) } }));
 }
@@ -76,6 +84,7 @@ function makeBridge(): AgentBridge {
         goals: useApp.getState().predicates.map((p) => ({ goal: p.label, pass: p.pass, detail: p.detail })),
         targets: Object.values(all).map((x) => ({ name: x.name, kind: x.source, pose: x.pose })),
         inputs: host.sim.scene.io.inputs.map((i) => i.name), outputs: host.sim.scene.io.outputs.map((o) => o.name),
+        ...(agentFeatures().plans ? { plan: planSummary(useApp.getState().plans[useApp.getState().taskId]) ?? 'No plan yet.' } : {}),
       };
     },
     readProgram: () => {
@@ -104,7 +113,68 @@ function makeBridge(): AgentBridge {
       logEvent('agent_proposal', { proposalId: proposal.id, kind: editor, program: input.program, steps: input.steps, explanation: input.explanation, dryRun: proposal.dryRun, promptVersion: PROMPT_VERSION });
       return { shownToUser: true, proposalId: proposal.id, dryRun: proposal.dryRun, note: 'The user now sees a preview with Accept / Reject. Summarize the change in one or two sentences; do not repeat the program.' };
     },
+    showBlocks: ({ steps, caption }) => {
+      if (!Array.isArray(steps) || !steps.length) return { error: 'Pass a non-empty steps array.' };
+      // a picture may use positions the user has not taught yet; everything else must be valid
+      const errs = validateSteps(steps, stepEnv()).filter((e) => !/unknown target/.test(e));
+      if (errs.length) return { error: 'Invalid steps — nothing was shown.', problems: errs.slice(0, 12) };
+      const json = stepsToWorkspaceJson(steps);
+      pushVisual({ id: nid(), role: 'visual', text: caption ?? '', visual: { kind: 'blocks', json, caption } });
+      logEvent('agent_visual', { kind: 'blocks', steps, caption });
+      return { shownToUser: true, note: 'The picture is in the chat. Refer to it briefly; do not repeat the steps as text.' };
+    },
+    showExample: ({ clip, caption }) => {
+      const c = clipById(clip);
+      if (!c) return { error: `Unknown clip ${clip}.` };
+      pushVisual({ id: nid(), role: 'visual', text: caption ?? c.title, visual: { kind: 'clip', clip, caption: caption ?? c.title } });
+      logEvent('agent_visual', { kind: 'clip', clip, caption });
+      return { shownToUser: true, clip: c.title, note: 'The GIF is playing in the chat. Add one or two sentences on what to notice.' };
+    },
+    makePlan: ({ title, steps }) => {
+      const st = useApp.getState();
+      const plan = { id: `plan${Date.now().toString(36)}`, title, createdAt: Date.now(), steps: steps.map((x) => ({ text: x.text, check: normalizeCheck(x.check), done: false })) };
+      st.set((s) => ({ plans: { ...s.plans, [s.taskId]: plan } }));
+      pushVisual({ id: nid(), role: 'plan', text: title, planId: plan.id });
+      logEvent('agent_plan', { planId: plan.id, title, steps: plan.steps.map((x) => ({ text: x.text, check: x.check })) });
+      return { shownToUser: true, planId: plan.id, note: 'The checklist is pinned in the chat and ticks itself off. Introduce it in one sentence; do not list the steps again.' };
+    },
+    previewProposal: async ({ proposalId }) => {
+      const msgs = useApp.getState().chats[useApp.getState().taskId] ?? [];
+      const m = [...msgs].reverse().find((x) => x.proposal && x.proposal.status === 'pending' && (!proposalId || x.proposal.id === proposalId));
+      if (!m?.proposal) return { error: 'No pending proposal to preview.' };
+      return previewProposal(m.proposal, 'agent');
+    },
   };
+}
+
+function normalizeCheck(c?: Record<string, unknown>): PlanCheck | undefined {
+  if (!c || typeof c.type !== 'string') return undefined;
+  switch (c.type) {
+    case 'target': return { type: 'target', name: typeof c.name === 'string' && c.name ? c.name : undefined };
+    case 'uses': return typeof c.command === 'string' ? { type: 'uses', command: c.command as Extract<PlanCheck, { type: 'uses' }>['command'] } : undefined;
+    case 'screen': return typeof c.screen === 'string' ? { type: 'screen', screen: c.screen as Extract<PlanCheck, { type: 'screen' }>['screen'] } : undefined;
+    case 'holding': return { type: 'holding' };
+    case 'run': return { type: 'run' };
+    case 'goal': return typeof c.index === 'number' ? { type: 'goal', index: c.index } : undefined;
+  }
+  return undefined;
+}
+
+/** Replays a proposal on the ghost arm from the robot's current pose. Nothing real moves. */
+export async function previewProposal(p: Proposal, source: 'agent' | 'user') {
+  const st = useApp.getState();
+  if (st.runState !== 'idle') return { error: 'A program is running; preview after it stops.' };
+  const steps = (p as Proposal & { steps?: Step[] }).steps;
+  const src = p.kind === 'code' ? p.newProgram : steps ? stepsToJs(steps) : undefined;
+  if (!src) return { error: 'Nothing to preview.' };
+  host.syncTargets();
+  const trace = await dryRun(host.sim, src, host.task.predicates, { maxSimTimeSec: Math.min(120, host.task.maxSimTimeSec ?? 120), seed: host.task.seed, recordEvery: 1 / 30 });
+  const frames = trace.frames ?? [];
+  if (frames.length < 2) return { error: 'The preview has no motion.' };
+  const speed = Math.max(1, Math.min(4, frames[frames.length - 1].t / 12)); // keep long previews under ~12 s
+  playGhost({ frames, speed, label: p.explanation });
+  logEvent('preview_play', { proposalId: p.id, source, simSec: frames[frames.length - 1].t, outcome: trace.outcome });
+  return { playing: true, seconds: Math.round(frames[frames.length - 1].t / speed), outcome: trace.outcome, note: 'The ghost robot is replaying the proposal in the 3D view now.' };
 }
 
 export async function sendToAgent(text: string) {
@@ -126,8 +196,9 @@ export async function sendToAgent(text: string) {
   const system = systemPrompt({
     taskTitle: host.task.title, taskBrief: host.task.brief, armName: ARMS[host.armId()].name, editor: ws.editor, mode,
     targets: Object.keys(sim.allTargets()), inputs: sim.scene.io.inputs.map((i) => i.name), outputs: sim.scene.io.outputs.map((o) => o.name),
+    features: agentFeatures(),
   });
-  const tools = makeTools(makeBridge(), mode);
+  const tools = makeTools(makeBridge(), mode, agentFeatures());
   const llm = makeModel(model, { getToken: getIdToken, sessionId: () => useApp.getState().study?.sessionId ?? null });
   let current: string | null = null;
   const toolMsgs = new Map<string, string>();
@@ -148,6 +219,7 @@ export async function sendToAgent(text: string) {
       const mid = toolMsgs.get(id);
       const isErr = /^\s*(\{"error"|Error)/.test(output);
       if (mid) patchMsg(mid, { tool: { name, status: isErr ? 'error' : 'done' } });
+      flushVisuals();
       logEvent('agent_tool_call', { name, result: output.slice(0, 4000), durationMs: Math.round(performance.now() - (toolStart.get(id) ?? performance.now())), promptVersion: PROMPT_VERSION });
     },
     onModelMessage: (m: AIMessage, latencyMs: number) => {
@@ -181,6 +253,7 @@ export async function sendToAgent(text: string) {
       logEvent('agent_error', { status, message: err.message });
     }
   } finally {
+    flushVisuals();
     useApp.getState().set({ agentBusy: false });
     abort = null;
   }

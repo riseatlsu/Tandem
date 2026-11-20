@@ -4,9 +4,15 @@ import type { RunTrace } from '../runtime/protocol';
 import type { RunState } from '../runtime/ProgramRunner';
 
 export type AgentMode = 'off' | 'qa' | 'suggest';
+/** Per-condition AI-partner features (all on in the demo). */
+export interface AgentFeatures { visuals: boolean; plans: boolean; preview: boolean }
+export const ALL_FEATURES: AgentFeatures = { visuals: true, plans: true, preview: true };
+export const NO_FEATURES: AgentFeatures = { visuals: false, plans: false, preview: false };
+export type JogMode = 'axes13' | 'axes46' | 'linear' | 'reorient';
+export type PendantScreen = 'home' | 'task' | 'program' | 'jog' | 'positions' | 'io' | 'log' | 'settings';
 export interface StudyInfo {
   code: string; sessionId: string; experimentId: string; condition: string;
-  taskSequence: string[]; agentMode: AgentMode; model?: string; promptVersion: string; postSurveyUrl?: string;
+  taskSequence: string[]; agentMode: AgentMode; features: AgentFeatures; model?: string; promptVersion: string; postSurveyUrl?: string;
 }
 export interface Workspace {
   editor: 'blocks' | 'code';
@@ -16,11 +22,27 @@ export interface Workspace {
 }
 export interface ConsoleLine { id: number; simTime: number; text: string; kind: 'log' | 'fault' | 'info'; line?: number }
 export interface ChatMsg {
-  id: string; role: 'user' | 'assistant' | 'tool' | 'proposal' | 'error';
+  id: string; role: 'user' | 'assistant' | 'tool' | 'proposal' | 'error' | 'visual' | 'plan';
   text: string;
+  visual?: ChatVisual;
+  planId?: string;
   tool?: { name: string; status: 'running' | 'done' | 'error'; summary?: string };
   proposal?: Proposal;
 }
+export type ChatVisual =
+  | { kind: 'blocks'; json: object; caption?: string }
+  | { kind: 'clip'; clip: string; caption?: string };
+/** A check that ticks a plan step automatically; steps without one are ticked by the user. */
+export type PlanCheck =
+  | { type: 'target'; name?: string }
+  | { type: 'uses'; command: 'moveJ' | 'moveL' | 'home' | 'gripper.open' | 'gripper.close' | 'waitFor' | 'io.set' | 'wait' | 'loop' | 'offset' }
+  | { type: 'screen'; screen: PendantScreen }
+  | { type: 'holding' }
+  | { type: 'run' }
+  | { type: 'goal'; index: number };
+export interface PlanStep { text: string; check?: PlanCheck; done: boolean }
+export interface Plan { id: string; title: string; steps: PlanStep[]; createdAt: number }
+export interface TourState { step: number; required: boolean }
 export interface Proposal {
   id: string; kind: 'code' | 'blocks'; explanation: string;
   newProgram?: string; blocksJson?: object;
@@ -30,6 +52,8 @@ export interface Proposal {
 }
 
 interface AppState {
+  route: 'landing' | 'app';
+  landingMusic: boolean;
   mode: 'demo' | 'study';
   study: StudyInfo | null;
   taskIndex: number;
@@ -45,12 +69,17 @@ interface AppState {
   predicates: PredicateResult[];
   passed: Record<string, boolean>;
   showSuccess: boolean;
-  jog: { mode: 'joint' | 'cart'; frame: 'base' | 'tool'; step: number };
+  jog: { mode: JogMode; frame: 'base' | 'tool'; step: number };
+  pendantScreen: PendantScreen;
+  agentOpen: boolean;
   handGuide: boolean;
   handGuideMode: 'translate' | 'rotate';
   handGuideBlocked: boolean;
   showFrames: boolean;
   chats: Record<string, ChatMsg[]>;
+  plans: Record<string, Plan>;
+  tour: TourState | null;
+  tourDone: boolean;
   agentBusy: boolean;
   demoModel: string;
   toasts: { id: number; text: string; tone?: 'info' | 'good' | 'bad' }[];
@@ -60,11 +89,11 @@ interface AppState {
 }
 
 export const useApp = create<AppState>((set) => ({
-  mode: 'demo', study: null, taskIndex: 0, taskId: 'tut-jog-teach', armOverride: null,
+  route: 'app', landingMusic: false, mode: 'demo', study: null, taskIndex: 0, taskId: 'tut-jog-teach', armOverride: null,
   workspaces: {}, runState: 'idle', speed: 1, highlight: {}, console: [], lastTrace: null, fault: null,
   predicates: [], passed: {}, showSuccess: false,
-  jog: { mode: 'joint', frame: 'base', step: 10 }, handGuide: false, handGuideMode: 'translate', handGuideBlocked: false, showFrames: true,
-  chats: {}, agentBusy: false, demoModel: 'gpt-5-mini', toasts: [], taskStartedAt: Date.now(), timeLeftSec: null,
+  jog: { mode: 'axes13', frame: 'base', step: 1 }, pendantScreen: 'home', agentOpen: false, handGuide: false, handGuideMode: 'translate', handGuideBlocked: false, showFrames: true,
+  chats: {}, plans: {}, tour: null, tourDone: false, agentBusy: false, demoModel: 'gpt-5-mini', toasts: [], taskStartedAt: Date.now(), timeLeftSec: null,
   set: (p) => set(typeof p === 'function' ? p : () => p),
 }));
 

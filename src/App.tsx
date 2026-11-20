@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp } from './store';
 import { Topbar } from './panels/Topbar';
-import { TaskPanel } from './panels/TaskPanel';
-import { TargetsPanel } from './panels/TargetsPanel';
-import { JogPanel } from './panels/JogPanel';
-import { RunBar } from './panels/RunBar';
-import { EditorArea } from './panels/EditorArea';
-import { ChatPanel, askAboutFault } from './panels/ChatPanel';
+import { Pendant } from './pendant/Pendant';
+import { AgentDock, askAboutFault } from './panels/ChatPanel';
 import { Viewport } from './view/Viewport';
 import { Gate } from './panels/Gate';
+import { ErrorBoundary } from './ui/ErrorBoundary';
+import { Splitter } from './ui/Splitter';
 import { startDemo } from './study/session';
 import { agentMode } from './agent/controller';
+import { TourOverlay, startTour } from './tour/Tour';
+import { TASKS } from './content';
 
 function Bokeh() {
   const bubbles = [[8, 70, 120, 0], [22, 18, 60, 4], [78, 12, 90, 8], [90, 64, 140, 2], [55, 85, 70, 6], [40, 6, 40, 10], [66, 40, 30, 3]];
@@ -31,9 +31,14 @@ export function App() {
   const taskId = useApp((s) => s.taskId);
   const study = useApp((s) => s.study);
   const [booted, setBooted] = useState(false);
+  const stageRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (!wantsStudy) startDemo();
+    if (!wantsStudy) {
+      const t = params.get('demo') ?? params.get('task') ?? '';
+      startDemo(TASKS[t] ? t : undefined);
+      if (params.has('tour')) startTour();
+    }
     setBooted(true);
   }, []);  
 
@@ -46,20 +51,14 @@ export function App() {
       <Bokeh />
       <div className="app">
         <Topbar />
-        <main className={`workspace ${am === 'off' ? 'no-agent' : ''}`}>
-          <div className="col">
-            <TaskPanel />
-            <TargetsPanel />
-            <JogPanel />
-          </div>
-          <div className="center-col">
-            <Viewport onAskAgent={am !== 'off' ? askAboutFault : undefined} />
-            <RunBar />
-            <EditorArea />
-          </div>
-          {am !== 'off' && <div className="col"><ChatPanel /></div>}
+        <main className="stage" ref={stageRef}>
+          <ErrorBoundary label="cell view"><Viewport onAskAgent={am !== 'off' ? askAboutFault : undefined} /></ErrorBoundary>
+          <Splitter stage={stageRef} />
+          <ErrorBoundary label="teach pendant"><Pendant /></ErrorBoundary>
         </main>
       </div>
+      {am !== 'off' && <ErrorBoundary label="AI partner" compact><AgentDock /></ErrorBoundary>}
+      <ErrorBoundary label="tour" compact><TourOverlay /></ErrorBoundary>
       <Toasts />
       <MobileBlock />
     </>

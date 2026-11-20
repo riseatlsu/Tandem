@@ -50,8 +50,12 @@ export class RobotVisual {
   private mats: THREE.MeshPhysicalMaterial[] = [];
   private flash = 0;
 
-  constructor(private arm: ArmDef) {
-    this.group.name = 'robot';
+  private ghostMat: THREE.MeshPhysicalMaterial | null = null;
+
+  /** `ghost` builds a translucent, shadowless copy used for motion previews. */
+  constructor(private arm: ArmDef, opts: { ghost?: boolean } = {}) {
+    this.group.name = opts.ghost ? 'ghost' : 'robot';
+    if (opts.ghost) this.ghostMat = new THREE.MeshPhysicalMaterial({ color: '#7fdcff', emissive: new THREE.Color('#2aa8ff'), emissiveIntensity: 0.45, roughness: 0.15, transparent: true, opacity: 0.34, depthWrite: false });
     this.arm.links.forEach(() => {
       const g = new THREE.Group();
       g.matrixAutoUpdate = false;
@@ -61,9 +65,15 @@ export class RobotVisual {
     if (arm.visual.source === 'uaibot') this.loadUaibot(arm.visual.model);
     else this.buildProcedural(arm.visual.color, arm.visual.accent);
     this.buildGripper();
+    this.unshadow();
   }
 
-  private track<T extends THREE.Material>(m: T): T { if (m instanceof THREE.MeshPhysicalMaterial) this.mats.push(m); return m; }
+  private track<T extends THREE.Material>(m: T): T {
+    if (this.ghostMat) { m.dispose(); return this.ghostMat as unknown as T; }
+    if (m instanceof THREE.MeshPhysicalMaterial) this.mats.push(m);
+    return m;
+  }
+  private unshadow() { if (this.ghostMat) this.group.traverse((o) => { o.castShadow = false; o.receiveShadow = false; o.renderOrder = 5; }); }
 
   private loadUaibot(model: 'kuka_kr5' | 'epson_t6') {
     const loader = new OBJLoader();
@@ -74,6 +84,7 @@ export class RobotVisual {
         root.scale.set(0.001, 0.001, 0.001);
         p.apply(root);
         this.frames[p.frame].add(root);
+        this.unshadow();
       });
     }
   }
@@ -183,6 +194,7 @@ export class RobotVisual {
       if (m.isMesh) { m.geometry.dispose(); }
     });
     this.mats.forEach((m) => m.dispose());
+    this.ghostMat?.dispose();
   }
 }
 

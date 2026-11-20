@@ -17,9 +17,10 @@ npm run test:functions               # functions + Firestore rules in Firebase e
 npm run lint && npm run typecheck
 npm run build                        # docs index → tsc → vite build (VITE_BASE defaults to /FactorySim/)
 npm run docs:index                   # content/docs/*.md → src/agent/docs-index.json (re-run after editing docs)
+npx tsx scripts/record-clips.ts      # re-record public/clips/*.gif + landing thumbnails (needs mock-llm + a VITE_E2E dev server on :5180; see file header)
 ```
 
-Without Firebase configured, `/?code=TEST-SUGGEST-1` (or `TEST-QA-n` / `TEST-OFF-n`) starts a local study session that logs to IndexedDB. In dev and E2E builds, `window.__tandem` exposes `{ useApp, host, programSource, updateWorkspace }` and `window.__tandemSetSteps(steps)` for driving the app from tests.
+`/` is the landing page; the app is at `/?demo` (`?demo=<taskId>`, `&tour`). Without Firebase configured, `/?code=TEST-SUGGEST-1` (or `TEST-QA-n` / `TEST-OFF-n`) starts a local study session that logs to IndexedDB. In dev and E2E builds, `window.__tandem` exposes `{ useApp, host, programSource, updateWorkspace }` and `window.__tandemSetSteps(steps)` for driving the app from tests.
 
 ## Architecture
 
@@ -34,8 +35,13 @@ Without Firebase configured, `/?code=TEST-SUGGEST-1` (or `TEST-QA-n` / `TEST-OFF
 - **One API, three descriptions.** If you change the robot API, update `runtime/robotApi.ts`, `editor/robotApiDts.ts` (Monaco typings), `content/docs/*.md` (then `npm run docs:index`), the block generator in `blocks/definitions.ts`, `blocks/steps.ts` (`stepsToJs`), and the system prompt (`agent/prompts/system.vN.ts`, bumping `PROMPT_VERSION`).
 - **Blocks** compile one way to JS. The agent reads and proposes block programs as compact JSON "steps" (`blocks/steps.ts`), which are validated against known targets and signals before anything is shown to the user.
 - **Content is data.** Arms, scenes, tasks and experiments live in `content/**/*.json`, validated by zod in `src/content/index.ts`. Every task has a reference solution in `tests/fixtures/solutions/<task>.js` that must pass. Add one when you add a task, because it is how scene geometry gets validated.
+- **UI.** Two views: `view/Viewport.tsx` (3D cell + cell-level controls) and `pendant/Pendant.tsx` (teach pendant). The pendant shows one screen at a time (`useApp.pendantScreen`, navigate with `go()` from `pendant/screens.tsx`), with hardware run keys underneath. The Program screen is never unmounted, so Blockly state and the generated JS survive navigation. The AI partner (`panels/ChatPanel.tsx`) is a status-bar button (`AgentButton`) plus a draggable floating window (`AgentDock`). Its modals are portaled to `document.body`, because `backdrop-filter` ancestors trap `position: fixed`. E2E helpers `pendant(page, 'Jog')` and `openAgent(page)` navigate the UI. Demo task jumps go through the top-bar bubbles (`getByRole('button', { name: /^Task 2:/ })`).
+- **Audio** (`src/audio/`) is all WebAudio synthesis: `sound.ts` (effects, wired by `initSound()` through a global pointer listener and a store subscription; `soundFrame()` is called from the render loop for the motor hum) and `music.ts` (demo-only generative music, or `public/music/theme.mp3` if present). Headless Chromium's realtime audio clock is unreliable, so verify synthesis with an `OfflineAudioContext` render instead.
+- **Landing / routing**: `main.tsx` picks the landing page (`src/landing/`, lazy, must not import Blockly/Monaco/LangChain) or the app (`?demo`, `?code`, `?study`). The hero replays reference solutions through `runHeadless({ onStep })`.
+- **Tour** (`src/tour/`): steps in `steps.ts` target `data-tour="…"` attributes. If you rename or move those elements, update the steps. It's required in study mode (untimed; task 1 restarts after it), so E2E study flows call `finishTour(page)`.
 - **AI partner** (`src/agent/`) is a LangGraph.js ReAct graph (≤ 8 tool calls per turn) in the browser, calling OpenAI through `ChatOpenAI` pointed at the Firebase `llmProxy`, with `useResponsesApi: false`.
-  - Tools are gated by agent mode (`off` / `qa` / `suggest`).
+  - Tools are gated by agent mode (`off` / `qa` / `suggest`) and by per-condition `features` (`visuals`: `show_blocks`/`show_example`; `plans`: `make_plan`; `preview`: `preview_proposal` ghost replay). All features are on in the demo. Visual messages are queued until their tool's status pill appears.
+  - GIFs come only from the curated list in `agent/clips.ts`, which must match `public/clips/*.gif`.
   - The agent never edits directly: `propose_patch` auto dry-runs and creates a proposal card that the user accepts or rejects.
   - `jsonProtocol.ts` is the fallback for models without tool calling.
 - **Backend** (`functions/src`): `llmProxy` and `redeemCode` (HTTPS `onRequest`).

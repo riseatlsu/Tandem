@@ -19,7 +19,7 @@ export async function runAndWait(page: Page, speed = 10) {
   await expect.poll(() => app<string>(page, `return T.useApp.getState().runState;`), { timeout: 90_000 }).toBe('idle');
 }
 export async function clearStorage(page: Page) {
-  await page.goto('/');
+  await page.goto('/?demo');
   await page.evaluate(async () => { localStorage.clear(); await new Promise<void>((r) => { const q = indexedDB.deleteDatabase('keyval-store'); q.onsuccess = q.onerror = q.onblocked = () => r(); }); });
 }
 export async function localLogs(page: Page, sessionId: string): Promise<{ seq: number; type: string; data: Record<string, unknown> }[]> {
@@ -30,4 +30,33 @@ export async function localLogs(page: Page, sessionId: string): Promise<{ seq: n
     const queued = ((await get(`tandem.logqueue.${sid}`)) ?? []) as unknown[];
     return [...batches.flat(), ...queued] as { seq: number; type: string; data: Record<string, unknown> }[];
   }, sessionId);
+}
+
+/** Open a teach-pendant screen: dock items directly, the rest from the Home screen. */
+export async function pendant(page: Page, name: 'Home' | 'Program' | 'Jog' | 'Positions' | 'Task' | 'I/O' | 'Log' | 'Settings') {
+  const dock = page.getByRole('navigation', { name: 'Pendant screens' });
+  if (['Home', 'Program', 'Jog', 'Positions'].includes(name)) { await dock.getByRole('button', { name, exact: true }).click(); return; }
+  await dock.getByRole('button', { name: 'Home', exact: true }).click();
+  if (name === 'Task') await page.locator('.task-card').click();
+  else await page.locator('.app-tile', { hasText: name }).click();
+}
+export async function openAgent(page: Page) {
+  await page.getByRole('button', { name: 'Open AI partner' }).click();
+  await expect(page.getByLabel('Message the AI partner')).toBeVisible();
+}
+
+/** Walk through the guided tour: Next where allowed, otherwise click the spotlighted control. */
+export async function finishTour(page: Page, { expectRequired = false } = {}) {
+  const card = page.locator('.tour-card');
+  await expect(card).toBeVisible();
+  if (expectRequired) await expect(card.getByRole('button', { name: 'Skip tour' })).toHaveCount(0);
+  for (let i = 0; i < 30 && (await card.count()); i++) {
+    const next = card.locator('.tour-foot .btn.aqua');
+    if (await next.isDisabled()) {
+      const b = (await page.locator('.tour-spot').boundingBox())!;
+      await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+    } else await next.click();
+    await page.waitForTimeout(250);
+  }
+  await expect(card).toHaveCount(0);
 }

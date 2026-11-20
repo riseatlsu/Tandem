@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { MOCK, app, clearStorage, mockRequests, resetMock, runAndWait, setBlocks } from './helpers';
+import { MOCK, app, clearStorage, mockRequests, openAgent, resetMock, runAndWait, setBlocks } from './helpers';
 
 test('demo: no code needed, streamed answer, nothing logged, quota message, sim keeps working', async ({ page }) => {
   await clearStorage(page);
   await resetMock();
-  await page.goto('/');
+  await page.goto('/?demo');
   await expect(page.locator('.chip', { hasText: 'Demo' })).toBeVisible();
+  await openAgent(page);
   await page.getByLabel('Model').selectOption('gpt-5-nano');
   const input = page.getByLabel('Message the AI partner');
   await input.fill('How do I make a linear move?');
@@ -19,7 +20,7 @@ test('demo: no code needed, streamed answer, nothing logged, quota message, sim 
   await input.press('Enter');
   await expect(page.locator('.msg.assistant').last()).toContainText('usage limit');
 
-  await page.getByLabel('Choose task').selectOption('tut-first-program');
+  await page.getByRole('button', { name: /^Task 2:/ }).click();
   await setBlocks(page, [{ home: true }, { move: 'place.approach' }, { move: 'bin.drop' }, { home: true }]);
   await runAndWait(page);
   expect(await app<string>(page, `return T.useApp.getState().lastTrace.outcome;`)).toBe('completed');
@@ -27,8 +28,8 @@ test('demo: no code needed, streamed answer, nothing logged, quota message, sim 
 });
 
 test('sandbox: no network access, runaway loops are stopped', async ({ page }) => {
-  await page.goto('/');
-  await page.getByLabel('Choose task').selectOption('tut-first-program');
+  await page.goto('/?demo');
+  await page.getByRole('button', { name: /^Task 2:/ }).click();
   await app(page, `T.updateWorkspace({ editor: 'code', code: "await robot.home();\\nawait fetch('https://example.com');\\n" }); return null;`);
   await runAndWait(page);
   expect(await app<{ code: string; line: number }>(page, `return T.useApp.getState().lastTrace.fault;`)).toMatchObject({ code: 'USER_ERROR', line: 2 });

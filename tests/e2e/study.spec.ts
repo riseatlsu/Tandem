@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { app, clearStorage, localLogs, resetMock, runAndWait, setBlocks } from './helpers';
+import { app, clearStorage, finishTour, localLogs, openAgent, pendant, resetMock, runAndWait, setBlocks } from './helpers';
 
 const POUR = readFileSync('tests/fixtures/solutions/kitchen-pour.js', 'utf8');
 
 test('study happy path: teach → fault → AI fix → pour → resume → finish, fully logged', async ({ page }) => {
+  test.setTimeout(240_000); // longest flow: three tasks, several sim runs and a reload
   await clearStorage(page);
   await resetMock();
   await page.route('https://example.org/**', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Survey</h1>' }));
@@ -12,15 +13,26 @@ test('study happy path: teach → fault → AI fix → pour → resume → finis
   await page.goto('/?code=TEST-SUGGEST-1');
   await expect(page.getByText('Study · TEST-SUGGEST-1')).toBeVisible();
   await expect(page.getByText('Task 1 of 3')).toBeVisible();
+  // the interface tour is required (no skip) and untimed; task 1 restarts fresh afterwards
+  const t0 = await app<number>(page, `return T.useApp.getState().timeLeftSec ?? -1;`);
+  await finishTour(page, { expectRequired: true });
+  expect(await app<boolean>(page, `return T.useApp.getState().tourDone;`)).toBe(true);
+  expect(await app<number>(page, `return T.useApp.getState().timeLeftSec ?? -1;`)).toBe(t0);
+  await openAgent(page);
   await expect(page.getByLabel('Model')).toHaveCount(0); // model is locked (no picker)
   await expect(page.locator('.panel-head .chip', { hasText: 'gpt-5-mini' })).toBeVisible();
+  await page.getByRole('button', { name: 'Collapse AI partner' }).click();
+  await expect(page.getByLabel('Message the AI partner')).toHaveCount(0);
 
-  // ---- Task 1: jog, hand guide, teach P1
+  // ---- Task 1: jog, hand guide, teach P1 (on the pendant)
+  await pendant(page, 'Jog');
   await page.getByRole('button', { name: 'J1 plus' }).click();
   await page.getByRole('button', { name: 'Hand guide' }).click();
   expect(await page.evaluate(() => (window as unknown as { __tandemGuide: (dx: number) => boolean }).__tandemGuide(50))).toBe(true);
-  await page.getByRole('button', { name: 'Teach' }).first().click();
+  await page.getByRole('button', { name: 'Teach position' }).click();
+  await pendant(page, 'Positions');
   await expect(page.locator('.target-row .name', { hasText: /^P1$/ })).toBeVisible();
+  await pendant(page, 'Task');
   await expect(page.locator('.checklist li.pass')).toHaveCount(1);
   await page.getByRole('button', { name: /Next task/ }).click();
 
@@ -29,7 +41,7 @@ test('study happy path: teach → fault → AI fix → pour → resume → finis
   await setBlocks(page, [{ home: true }, { moveOffset: 'place', dx: 900, dy: 0, dz: 0 }]);
   await runAndWait(page);
   await expect(page.getByText('PROTECTIVE STOP · UNREACHABLE')).toBeVisible();
-  await page.getByRole('button', { name: 'Ask AI partner about this' }).click();
+  await page.getByRole('button', { name: 'Ask AI partner about this' }).click(); // opens the partner window
   const card = page.locator('.proposal');
   await expect(card).toContainText('Suggested blocks');
   await expect(card).toContainText('3/3 goals');
@@ -59,7 +71,7 @@ test('study happy path: teach → fault → AI fix → pour → resume → finis
   const seqs = logs.map((e) => e.seq);
   expect(seqs).toEqual(Array.from({ length: seqs.length }, (_, i) => i + 1));
   const types = logs.map((e) => e.type);
-  const order = ['session_start', 'task_start', 'handguide_start', 'handguide_end', 'target_teach', 'task_start', 'run_start', 'run_fault', 'agent_user_msg', 'agent_tool_call', 'agent_proposal', 'agent_proposal_decision', 'run_end', 'task_start', 'resume', 'session_end'];
+  const order = ['session_start', 'task_start', 'tour_start', 'tour_step', 'tour_end', 'task_start', 'handguide_start', 'handguide_end', 'target_teach', 'task_start', 'run_start', 'run_fault', 'agent_user_msg', 'agent_tool_call', 'agent_proposal', 'agent_proposal_decision', 'run_end', 'task_start', 'resume', 'session_end'];
   let from = 0;
   for (const t of order) { const i = types.indexOf(t, from); expect(i, `expected ${t} after index ${from}`).toBeGreaterThanOrEqual(0); from = i + 1; }
   expect(logs.some((e) => e.type === 'run_fault' && e.data.code === 'UNREACHABLE')).toBe(true);

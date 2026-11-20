@@ -1,15 +1,15 @@
 import { get as idbGet, set as idbSet } from 'idb-keyval';
 import { EXPERIMENTS, TASKS, TASK_ORDER, type ExperimentDef } from '../content';
-import { useApp, type StudyInfo, type Workspace, type ChatMsg } from '../store';
+import { useApp, NO_FEATURES, type StudyInfo, type Workspace, type ChatMsg, type Plan } from '../store';
 import { host } from '../simHost';
 import { flush, logEvent, startLogging, type LogSink } from './logger';
 import { callFunction, firebaseEnabled, getDb, initFirebase } from '../firebase';
 import { CONFIG } from '../config';
-import { PROMPT_VERSION } from '../agent/prompts/system.v1';
+import { PROMPT_VERSION } from '../agent/prompts/system.v2';
 import type { LogEvent } from './events';
 
 export interface RedeemResult { sessionId: string; experimentId: string; condition: string; orderIndex: number; checkpoint?: string | null; rebound?: boolean }
-interface Checkpoint { taskIndex: number; workspaces: Record<string, Workspace>; chats: Record<string, ChatMsg[]>; passed: Record<string, boolean>; timeLeftSec: number | null; savedAt: number }
+interface Checkpoint { taskIndex: number; workspaces: Record<string, Workspace>; chats: Record<string, ChatMsg[]>; plans?: Record<string, Plan>; passed: Record<string, boolean>; timeLeftSec: number | null; tourDone?: boolean; savedAt: number }
 
 /** Cyclic Latin square over the tasks after a fixed prefix (e.g. a tutorial that always comes first). */
 export function orderTasks(seq: string[], exp: ExperimentDef, orderIndex: number): string[] {
@@ -75,14 +75,14 @@ export async function redeem(rawCode: string): Promise<void> {
   const seq = orderTasks(cond.taskSequence, exp, r.orderIndex).filter((t) => TASKS[t]);
   const study: StudyInfo = {
     code, sessionId: r.sessionId, experimentId: exp.id, condition: r.condition, taskSequence: seq,
-    agentMode: cond.agent.mode, model: cond.agent.model, promptVersion: cond.agent.promptVersion, postSurveyUrl: exp.postSurveyUrl,
+    agentMode: cond.agent.mode, features: { ...NO_FEATURES, ...cond.agent.features }, model: cond.agent.model, promptVersion: cond.agent.promptVersion, postSurveyUrl: exp.postSurveyUrl,
   };
   // checkpoint: server copy first, then local
   let cp: Checkpoint | null = null;
   try { if (r.checkpoint) cp = JSON.parse(r.checkpoint); } catch { /* ignore */ }
   if (!cp) { try { cp = (await idbGet<Checkpoint>(`tandem.checkpoint.${r.sessionId}`)) ?? null; } catch { /* ignore */ } }
   const st = useApp.getState();
-  st.set({ mode: 'study', study, taskIndex: cp?.taskIndex ?? 0, armOverride: null, workspaces: cp?.workspaces ?? {}, chats: cp?.chats ?? {}, passed: cp?.passed ?? {} });
+  st.set({ route: 'app', mode: 'study', study, taskIndex: cp?.taskIndex ?? 0, armOverride: null, workspaces: cp?.workspaces ?? {}, chats: cp?.chats ?? {}, plans: cp?.plans ?? {}, passed: cp?.passed ?? {}, tourDone: !!cp?.tourDone || (cp?.taskIndex ?? 0) > 0 });
   await startLogging({
     sessionId: r.sessionId,
     sink: firebaseEnabled() ? firestoreSink(r.sessionId) : localSink(r.sessionId),
@@ -95,6 +95,8 @@ export async function redeem(rawCode: string): Promise<void> {
   host.loadTask(seq[idx]);
   if (cp?.timeLeftSec != null) useApp.getState().set({ timeLeftSec: cp.timeLeftSec });
   startCheckpointing();
+  // the interface tour is required before the first task (untimed); it is skipped on resume once done
+  if (cond.tour !== false && !useApp.getState().tourDone) useApp.getState().set({ tour: { step: 0, required: true } });
   const telemetry = exp.logging.telemetry;
   if (telemetry) startTelemetry();
 }
@@ -109,7 +111,8 @@ export async function saveCheckpoint(force = false) {
     taskIndex: s.taskIndex,
     workspaces: Object.fromEntries(Object.entries(s.workspaces).filter(([k]) => keep.has(k))),
     chats: Object.fromEntries(Object.entries(s.chats).filter(([k]) => keep.has(k)).map(([k, v]) => [k, v.slice(-60)])),
-    passed: s.passed, timeLeftSec: s.timeLeftSec, savedAt: Date.now(),
+    plans: Object.fromEntries(Object.entries(s.plans).filter(([k]) => keep.has(k))),
+    passed: s.passed, timeLeftSec: s.timeLeftSec, tourDone: s.tourDone, savedAt: Date.now(),
   };
   const data = JSON.stringify({ ...cp, savedAt: 0 });
   if (!force && data === lastCp) return;

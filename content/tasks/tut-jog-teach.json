@@ -1,8 +1,8 @@
 {
   "id": "tut-jog-teach", "title": "Teach your first target", "sceneId": "factory-pick", "armId": "gofa-like", "seed": 1,
   "editor": "blocks", "passOn": "live",
-  "brief": "Cobots are programmed by **showing** them where to go.\n\n1. Use the **Jog** panel to move the arm (try joint mode, then Cartesian).\n2. Turn on **Hand guide** and drag the glowing handle at the tool tip.\n3. Press **Teach** to save the pose. Rename it to `P1`.",
+  "brief": "Cobots are programmed by **showing** them where to go. A part is waiting at the end of the conveyor.\n\n1. Open **Jog** on the pendant. Push the stick to move the arm (try *Axes 1–3*, then *Linear*).\n2. Turn on **Hand guide** and drag the glowing handle at the tool tip.\n3. Bring the gripper just above the part and press **Teach position**. Make sure it is named `P1` (rename it in **Positions** if needed).",
   "predicates": [{ "type": "targetTaught", "name": "P1", "label": "A target named P1 is taught" }],
-  "conveyorOverrides": { "infeed": { "count": 0 } },
-  "hints": ["Hand guide is in the Jog panel. Drag the arrows, then press Teach.", "Double-click a target name to rename it."]
+  "conveyorOverrides": { "infeed": { "count": 1 } },
+  "hints": ["Jog is in the pendant's bottom dock. Drag the blue stick, or tap the arrows for small steps, then press Teach position.", "In Positions, the pencil button renames a position."]
 }

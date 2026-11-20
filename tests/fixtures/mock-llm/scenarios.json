@@ -4,45 +4,241 @@
       "name": "fault-fix",
       "match": "stopped with|fix it|what went wrong",
       "steps": [
-        { "tool": "read_last_run", "args": {} },
-        { "tool": "read_program", "args": {} },
-        { "tool": "dry_run", "args": { "steps": "$FIX_STEPS" } },
-        { "tool": "propose_patch", "args": { "steps": "$FIX_STEPS", "explanation": "The place pose you typed is out of reach. I switched it to the taught `place` target and added a straight-line approach." } },
-        { "text": "Your **place** target was outside the arm’s reach, so the controller stopped before moving. I’ve proposed blocks that use the cell’s `place` target with a straight-line approach — preview and accept it when you’re ready." }
+        {
+          "tool": "read_last_run",
+          "args": {}
+        },
+        {
+          "tool": "read_program",
+          "args": {}
+        },
+        {
+          "tool": "dry_run",
+          "args": {
+            "steps": "$FIX_STEPS"
+          }
+        },
+        {
+          "tool": "propose_patch",
+          "args": {
+            "steps": "$FIX_STEPS",
+            "explanation": "The place pose you typed is out of reach. I switched it to the taught `place` target and added a straight-line approach."
+          }
+        },
+        {
+          "text": "Your **place** target was outside the arm’s reach, so the controller stopped before moving. I’ve proposed blocks that use the cell’s `place` target with a straight-line approach — preview and accept it when you’re ready."
+        }
       ]
     },
     {
       "name": "fix-code",
       "match": "fix my code",
       "steps": [
-        { "tool": "read_program", "args": {} },
-        { "tool": "dry_run", "args": { "program": "$FIX_CODE" } },
-        { "tool": "propose_patch", "args": { "program": "$FIX_CODE", "explanation": "Wait for the sensor before picking, and approach in straight lines." } },
-        { "text": "I’ve proposed a version that waits for `part_present` first." }
+        {
+          "tool": "read_program",
+          "args": {}
+        },
+        {
+          "tool": "dry_run",
+          "args": {
+            "program": "$FIX_CODE"
+          }
+        },
+        {
+          "tool": "propose_patch",
+          "args": {
+            "program": "$FIX_CODE",
+            "explanation": "Wait for the sensor before picking, and approach in straight lines."
+          }
+        },
+        {
+          "text": "I’ve proposed a version that waits for `part_present` first."
+        }
       ]
     },
     {
       "name": "explain",
       "match": "linear move|moveL|straight",
       "steps": [
-        { "tool": "search_docs", "args": { "query": "linear move moveL" } },
-        { "text": "Use `robot.moveL(target)` for a **straight-line** move — ideal for the last few centimeters of an approach. In blocks, choose “straight line” in the Move block." }
+        {
+          "tool": "search_docs",
+          "args": {
+            "query": "linear move moveL"
+          }
+        },
+        {
+          "text": "Use `robot.moveL(target)` for a **straight-line** move — ideal for the last few centimeters of an approach. In blocks, choose “straight line” in the Move block."
+        }
+      ]
+    },
+    {
+      "name": "visual-help",
+      "match": "make me a plan|show me how",
+      "steps": [
+        {
+          "tool": "read_task",
+          "args": {}
+        },
+        {
+          "tool": "make_plan",
+          "args": {
+            "title": "Pick the part",
+            "steps": [
+              {
+                "text": "Open the Jog screen",
+                "check": {
+                  "type": "screen",
+                  "screen": "jog"
+                }
+              },
+              {
+                "text": "Teach a position above the part",
+                "check": {
+                  "type": "target"
+                }
+              },
+              {
+                "text": "Add a linear move down to the part",
+                "check": {
+                  "type": "uses",
+                  "command": "moveL"
+                }
+              },
+              {
+                "text": "Close the gripper in your program",
+                "check": {
+                  "type": "uses",
+                  "command": "gripper.close"
+                }
+              },
+              {
+                "text": "Run the program",
+                "check": {
+                  "type": "run"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "tool": "show_example",
+          "args": {
+            "clip": "teach-position",
+            "caption": "Jog above the part, then Teach position"
+          }
+        },
+        {
+          "tool": "show_blocks",
+          "args": {
+            "steps": "$PICK_SNIPPET",
+            "caption": "Approach, go straight down, grip, back up"
+          }
+        },
+        {
+          "text": "Here’s a **plan** that ticks itself off as you go, a clip of teaching a position, and the blocks for a safe pick."
+        }
+      ]
+    },
+    {
+      "name": "suggest-preview",
+      "match": "build (this|my|the) program for me|help me pick",
+      "steps": [
+        {
+          "tool": "read_program",
+          "args": {}
+        },
+        {
+          "tool": "dry_run",
+          "args": {
+            "steps": "$FIX_STEPS"
+          }
+        },
+        {
+          "tool": "propose_patch",
+          "args": {
+            "steps": "$FIX_STEPS",
+            "explanation": "Wait for the part, approach from above, grip, and place it on the fixture."
+          }
+        },
+        {
+          "tool": "preview_proposal",
+          "args": {}
+        },
+        {
+          "text": "Watch the **ghost robot** run my suggestion — accept it if it looks right."
+        }
       ]
     },
     {
       "name": "default",
       "match": ".*",
-      "steps": [{ "text": "Hi! I’m the mock AI partner. Ask me why your program stopped, or how to make a linear move." }]
+      "steps": [
+        {
+          "text": "Hi! I’m the mock AI partner. Ask me why your program stopped, or how to make a linear move."
+        }
+      ]
     }
   ],
   "fixtures": {
     "FIX_STEPS": [
-      { "home": true }, { "gripper": "open" },
-      { "waitInput": "part_present", "value": true },
-      { "move": "pick.approach" }, { "move": "pick", "mode": "linear" }, { "gripper": "close" }, { "move": "pick.approach", "mode": "linear" },
-      { "move": "place.approach" }, { "move": "place", "mode": "linear" }, { "gripper": "open" }, { "move": "place.approach", "mode": "linear" },
-      { "home": true }
+      {
+        "home": true
+      },
+      {
+        "gripper": "open"
+      },
+      {
+        "waitInput": "part_present",
+        "value": true
+      },
+      {
+        "move": "pick.approach"
+      },
+      {
+        "move": "pick",
+        "mode": "linear"
+      },
+      {
+        "gripper": "close"
+      },
+      {
+        "move": "pick.approach",
+        "mode": "linear"
+      },
+      {
+        "move": "place.approach"
+      },
+      {
+        "move": "place",
+        "mode": "linear"
+      },
+      {
+        "gripper": "open"
+      },
+      {
+        "move": "place.approach",
+        "mode": "linear"
+      },
+      {
+        "home": true
+      }
     ],
-    "FIX_CODE": "await robot.home();\nawait gripper.open();\nawait io.waitFor('part_present', true, 60000);\nawait robot.moveJ('pick.approach');\nawait robot.moveL('pick');\nawait gripper.close();\nawait robot.moveL('pick.approach');\nawait robot.moveJ('place.approach');\nawait robot.moveL('place');\nawait gripper.open();\nawait robot.moveL('place.approach');\nawait robot.home();\n"
+    "FIX_CODE": "await robot.home();\nawait gripper.open();\nawait io.waitFor('part_present', true, 60000);\nawait robot.moveJ('pick.approach');\nawait robot.moveL('pick');\nawait gripper.close();\nawait robot.moveL('pick.approach');\nawait robot.moveJ('place.approach');\nawait robot.moveL('place');\nawait gripper.open();\nawait robot.moveL('place.approach');\nawait robot.home();\n",
+    "PICK_SNIPPET": [
+      {
+        "move": "pick.approach"
+      },
+      {
+        "move": "pick",
+        "mode": "linear"
+      },
+      {
+        "gripper": "close"
+      },
+      {
+        "move": "pick.approach",
+        "mode": "linear"
+      }
+    ]
   }
 }

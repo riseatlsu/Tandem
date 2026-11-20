@@ -155,15 +155,15 @@ class SimHost {
     }
     return f;
   }
-  jogJoint(i: number, delta: number) {
+  jogJoint(i: number, delta: number, log = true) {
     if (this.busy()) return;
     if (this.manual) { this.sim.stopNow(); this.manual = false; }
     const q = this.sim.s.q.slice();
     q[i] += this.sim.jointType(i) === 'P' ? delta / 1000 : delta * DEG;
     this.jogFault(this.sim.setJoints(q));
-    logEvent('jog', { mode: 'joint', axis: i + 1, delta });
+    if (log) logEvent('jog', { mode: 'joint', axis: i + 1, delta });
   }
-  jogCart(axis: 0 | 1 | 2 | 3 | 4 | 5, delta: number, frame: 'base' | 'tool') {
+  jogCart(axis: 0 | 1 | 2 | 3 | 4 | 5, delta: number, frame: 'base' | 'tool', log = true) {
     if (this.busy()) return;
     if (this.manual) { this.sim.stopNow(); this.manual = false; }
     const T = this.sim.tcp();
@@ -178,7 +178,7 @@ class SimHost {
       target = mul(trans(p[0] + dt[0], p[1] + dt[1], p[2] + dt[2]), mul(dr, Tr));
     }
     this.jogFault(this.sim.moveTcpTo(target));
-    logEvent('jog', { mode: 'cart', frame, axis: ['x', 'y', 'z', 'rx', 'ry', 'rz'][axis], delta });
+    if (log) logEvent('jog', { mode: 'cart', frame, axis: ['x', 'y', 'z', 'rx', 'ry', 'rz'][axis], delta });
   }
   /** Hand-guide: returns true if the robot followed. */
   guideTo(target: M4): boolean {

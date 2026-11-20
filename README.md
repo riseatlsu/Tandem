@@ -23,6 +23,7 @@ VITE_BASE=/ npm run dev                                 # terminal 2: http://loc
 
 - **Demo mode:** open `/`.
 - **Study mode without Firebase:** open `/?code=TEST-SUGGEST-1`. `TEST-QA-1` and `TEST-OFF-1` also work, and logs are kept in IndexedDB.
+- **Music:** demo mode plays a built-in generated ambient track. To use a real track, save a royalty-free file (CC0 is safest) as `public/music/theme.mp3` or `.ogg` and it will loop instead. Keep the track's license notice next to it.
 
 | Command | What it does |
 |---|---|
@@ -57,7 +58,9 @@ VITE_BASE=/ npm run dev                                 # terminal 2: http://loc
 **Running a study**
 
 ```bash
-npx tsx scripts/gen-codes.ts --experiment pilot --per-condition 20 --project <id>     # prints a CSV of codes
+GOOGLE_APPLICATION_CREDENTIALS=~/keys/tandem-admin.json \
+  npx tsx scripts/gen-codes.ts --experiment pilot --per-condition 20 --project <id> > codes.csv   # writes codes/{CODE} docs + CSV
+# hand out https://<user>.github.io/FactorySim/?code=ABCD-EFGH (one code per participant; the link skips the landing page)
 npx tsx scripts/export-logs.ts --experiment pilot --project <id> --out exports/pilot
 ```
 

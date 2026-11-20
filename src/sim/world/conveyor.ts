@@ -22,10 +22,12 @@ export function stepConveyors(s: SimState, defs: ConveyorDef[], dt: number) {
         const [r2, ns2] = nextRandom(s.rng); s.rng = ns2;
         const yaw = Math.atan2(dir[1], dir[0]) / DEG;
         s.spawnCounter++;
+        // The first part starts waiting at the sensor (unless prefill is false), so the cell reads correctly before Run.
+        const startAt = st.spawned === 0 && c.spawn.prefill !== false ? L : 0;
         s.objects.push({
           id: `${c.spawn.kind}${s.spawnCounter}`, kind: c.spawn.kind, shape: c.spawn.shape ?? 'box',
           size: [c.spawn.size[0] / 1000, c.spawn.size[1] / 1000, c.spawn.size[2] / 1000],
-          pose: mul(trans(a[0], a[1], a[2]), rotZ(yaw * DEG)), color, graspable: true, onConveyor: c.id,
+          pose: mul(trans(a[0] + dir[0] * startAt, a[1] + dir[1] * startAt, a[2] + dir[2] * startAt), rotZ(yaw * DEG)), color, graspable: true, onConveyor: c.id,
         });
         st.spawned++;
         st.nextSpawn = s.simTime + c.spawn.intervalSec + c.spawn.jitterSec * (r2 * 2 - 1);

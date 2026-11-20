@@ -25,7 +25,45 @@ These decisions were made while building v1. They take precedence over the secti
   - Log events are stored with `data` as a JSON string, because Firestore forbids nested arrays.
   - `GET …/llmProxy/config` returns the demo model list.
 - **Local study mode.** Without Firebase configured, codes `TEST-SUGGEST-n`, `TEST-QA-n` and `TEST-OFF-n` start a study session that logs to IndexedDB. The E2E suite verifies the logging pipeline through this local sink. The Firestore path (rules, auth, quotas, model lock) is covered by the emulator tests in `functions/test/`.
+- **UI layout (two views).** The screen is split like a real cell: the 3D cell on the left and a **teach pendant** on the right (`src/pendant/`). Only one pendant screen shows at a time:
+  - **Home** shows the current task card and app tiles for Program, Jog, Positions, I/O, Log and Settings. A dock gives one-tap access to Home, Program, Jog and Positions. Task, I/O, Log and Settings are opened from Home.
+  - **Hardware keys** sit under the screen: Run/Resume, Pause, Step and a red STOP button. Shortcuts are ⌘/Ctrl+Enter to run and Esc to stop.
+  - **The cell view** holds the cell-level controls: goal chip (opens the Task screen), sim speed, Reset scene, camera buttons, the fault card (with “Show in program”) and the success card.
+  - **The Program screen** stays mounted (hidden with `visibility`) so Blockly keeps its state and generated JS while other screens are open.
+  - **Jog** works like a 3-axis joystick pendant:
+    - Motion modes are Axes 1–3, Axes 4–6, Linear and Reorient, with a Base/Tool frame for the last two.
+    - The stick drives the first two axes and a rocker drives the third, at speed proportional to deflection (40°/s, 150 mm/s or 100 mm/s for prismatic joints at full deflection).
+    - Arrow buttons step by 0.1, 1 or 10 per tap and repeat while held.
+    - A stick drag logs **one** `jog` event (`input: "joystick"`, per-axis totals, duration) when released. Arrow steps log per step as before.
+  - **AI partner** is reached from a button in the pendant's status bar. When open it is a floating window that can be dragged anywhere (position kept in `localStorage`). The minimize button collapses it back into the status bar. Opening and collapsing log `panel_toggle {agent}`, and screen changes log `panel_toggle {pendant}`. “Ask AI partner about this” opens it. In the `off` condition neither the button nor the window is rendered.
+  - Arm choice and Blocks/Code switching (demo only) moved to the Settings screen.
+- **Top bar task tracker.** The task dropdown is replaced by level-tracker bubbles. The current task is light blue, finished tasks are green with a check, and the rest are plain glossy bubbles. In demo mode the bubbles are buttons that jump to a task. In study mode they show the participant's sequence and are not clickable.
+- **Resizable split.** A drag bar between the cell view and the pendant sets `--pendant-w`, clamped so the pendant stays ≥ 400 px and the cell ≥ 360 px. ←/→ keys also work, with Shift for bigger steps. Double-click resets. The width is kept in `localStorage`, and changes log `panel_toggle {split}`.
+- **Sound** (`src/audio/sound.ts`) is fully synthesized with WebAudio, so no audio assets are needed. The AudioContext is created on the first gesture.
+  - **UI:** glassy taps on buttons and pops on navigation.
+  - **Robot:** a servo hum whose pitch and level follow the fastest joint's speed, a conveyor rumble while the belt runs, gripper whirs, and grasp and release clunks.
+  - **Events:** run start/pause/stop, the teach chime, the success arpeggio, the protective-stop alarm, and AI reply and proposal chimes.
+  - Toggles are in the top bar and in Settings (including volume), stored per viewer. Sound effects are available in both modes.
+- **Music (demo only)** (`src/audio/music.ts`): a generative ambient piece (maj9 pads, sub bass, pentatonic bells through a ping-pong delay, shaker) synthesized live, on repeat. If a royalty-free file is added at `public/music/theme.mp3` (or `.ogg`), it loops instead. Music never plays in study mode.
+- **Conveyor prefill.** The first part on a conveyor starts **at the sensor** (end of the belt, under the `pick` target) instead of at the far start, so the cell reads correctly before Run. Opt out with `"prefill": false` in the spawn config. Task 1 now has one waiting part, to teach above.
+- **Resilience.** The cell view, pendant, code/block editors and AI partner are each wrapped in an `ErrorBoundary`, so a failed lazy chunk can't blank the app. Vite pre-bundles monaco/blockly/three (`optimizeDeps.include`) to avoid dev-server “Outdated Optimize Dep” 504s.
 - **Program execution.** Each run gets its own module Worker with network/storage globals removed. The runaway guard is 3 s of wall-clock time with no robot command.
+- **Routing and landing page.** The site root shows a landing page (`src/landing/`, lazy-loaded, about 21 KB plus the shared 3D engine):
+  - live hero cell replaying reference solutions in real time (`runHeadless` with an `onStep` pacing hook);
+  - feature showcase with recorded clips, a level gallery that opens `?demo=<taskId>`, and a rotating robot lineup;
+  - a music toggle that is **off by default**.
+  `?demo[=taskId]` opens the app and `&tour` starts the tour. `?code=` / `?study` go straight to the study gate and never show the landing page. There is no code box on the landing page; participants use their link. The demo top-bar logo links back home.
+- **AI-partner features are per-condition flags** (`conditions.<c>.agent.features: { visuals, plans, preview }`, anything omitted is off; all on in the demo). They are recorded in `StudyInfo.features` and gate both the tools and the prompt section (`sys-v2`).
+  - `visuals`: `show_blocks` draws a read-only Blockly picture of JSON steps in the chat (untaught targets allowed). `show_example` plays a curated GIF from `src/agent/clips.ts`.
+  - `plans`: `make_plan` pins a 3–7 step checklist. Steps carry optional checks (`target`, `uses`, `screen`, `holding`, `run`, `goal`) that tick themselves from live state every 300 ms; the user ticks the others. Ticks are sticky and plans are checkpointed.
+  - `preview` (suggest only): `preview_proposal` and a "Show me" button on proposal cards. They dry-run the proposal from the robot's current pose with motion recording (`recordEvery`) and replay it on a translucent ghost arm in the cell view; the real robot never moves.
+  - New log events: `agent_visual`, `agent_plan`, `plan_step_done {by: auto|user}`, `preview_play {source: agent|user}`. The pilot (experiment version 2) declares all three features **off** for every condition, so its conditions match v1 apart from the prompt version.
+- **Curated clip library.** Ten 720×450 GIFs in `public/clips/` and eight level thumbnails in `public/landing/levels/`. They are recorded from the real app by `scripts/record-clips.ts` (Playwright, DevTools screencast, dependency-free PNG decode and GIF encode in `scripts/lib/gif.ts`), so every participant sees identical visuals. Re-record after UI changes.
+- **Guided tour** (`src/tour/`): a spotlight, a floating arrow and a glass card with optional GIFs, pointing at `data-tour="…"` anchors. Some steps wait for an action (open Jog, open Program) and move on by themselves.
+  - **Demo:** optional, closable, and replayable from Settings.
+  - **Study:** required before the first task (no skip; condition opt-out `tour: false`). The task timer is paused while it runs. The AI step appears only when the agent is not `off`, and describes that condition's mode and features.
+  - **When the study tour ends:** the first task's workspace, chat and plan are cleared and the task reloads, so `task_start` is logged again and the timer restarts.
+  - **Logging and resume:** `tour_start`, `tour_step` and `tour_end` are logged. `tourDone` is checkpointed, so a resume never repeats the tour.
 
 ---
 
@@ -558,6 +596,8 @@ A checkpoint is written to `checkpoint/current` (and IndexedDB) on every `progra
 ---
 
 ## 15. UI layout
+
+> **Superseded by the two-view pendant layout in §0 (“UI layout”).** The text below describes the original three-column draft.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐

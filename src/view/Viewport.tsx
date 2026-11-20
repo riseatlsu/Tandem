@@ -6,7 +6,11 @@ import { Icon } from '../ui/icons';
 import { logEvent } from '../study/logger';
 import { FAULT_HELP } from '../sim/types';
 import { ARMS } from '../content';
+import { go } from '../pendant/screens';
+import { soundFrame } from '../audio/sound';
+import { onGhost, playGhost } from './ghost';
 
+const SPEEDS = [0.25, 0.5, 1, 2, 5, 10];
 export function Viewport({ onAskAgent }: { onAskAgent?: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<Scene3D | null>(null);
@@ -19,9 +23,14 @@ export function Viewport({ onAskAgent }: { onAskAgent?: () => void }) {
   const taskId = useApp((s) => s.taskId);
   const armOverride = useApp((s) => s.armOverride);
   const editor = useApp((s) => s.workspaces[s.taskId]?.editor);
+  const preds = useApp((s) => s.predicates);
+  const speed = useApp((s) => s.speed);
   const set = useApp((s) => s.set);
   const [tcp, setTcp] = useState('');
   const guideStats = useRef({ fails: 0, start: '' });
+  const [ghost, setGhost] = useState(false);
+  useEffect(() => onGhost((c) => setGhost(!!c)), []);
+  useEffect(() => { /* stop the ghost when the scene changes */ playGhost(null); }, [taskId]);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -40,6 +49,9 @@ export function Viewport({ onAskAgent }: { onAskAgent?: () => void }) {
     }, (dt) => {
       if (!host.sim) return null;
       host.frame(dt);
+      const st = host.sim.s;
+      soundFrame(st.q, st.gripperOpen, st.holding?.id ?? null,
+        useApp.getState().runState === 'running' && host.sim.scene.conveyors.some((c) => st.outputs[c.runOutput] === true));
       const now = performance.now();
       if (now - lastRead > 120) {
         lastRead = now;
@@ -76,10 +88,13 @@ export function Viewport({ onAskAgent }: { onAskAgent?: () => void }) {
   void taskId; void armOverride;
 
   return (
-    <div className="viewport" ref={ref}>
+    <div className="viewport" ref={ref} data-tour="viewport">
       <div className="vp-overlay tl">
         <span className="chip"><span className="dot" style={{ color: '#1a8cff' }} />{host.sim?.scene.title}</span>
         <span className="chip">{armName}</span>
+        {preds.length > 0 && (() => { const done = preds.filter((p) => p.pass).length; return (
+          <button data-tour="goals" className={`chip chip-btn ${done === preds.length ? 'leaf' : ''}`} onClick={() => go('task')} title="Open the task on the pendant"><Icon.flag width={12} height={12} />{done}/{preds.length} goals</button>
+        ); })()}
       </div>
       <div className="vp-overlay tr">
         <div className="vp-glass">
@@ -87,12 +102,29 @@ export function Viewport({ onAskAgent }: { onAskAgent?: () => void }) {
           <button className="icon-btn" title="Reset camera" onClick={() => host.sim && sceneRef.current?.resetCamera(host.sim.scene)}><Icon.camera /></button>
         </div>
       </div>
+      {ghost && (
+        <div className="vp-overlay" style={{ left: '50%', top: 12, transform: 'translateX(-50%)' }}>
+          <span className="hg-banner ghost-banner"><span className="ghost-dot" /> Ghost preview — the real robot isn’t moving
+            <button className="icon-btn" aria-label="Stop preview" onClick={() => playGhost(null)}><Icon.x width={12} height={12} /></button></span>
+        </div>
+      )}
       {handGuide && (
         <div className="vp-overlay" style={{ left: '50%', top: 12, transform: 'translateX(-50%)' }}>
           <span className={`hg-banner ${blocked ? 'bad' : ''}`}>{blocked ? 'Can’t reach there — the arm holds its last valid pose' : 'Hand guiding · drag the handle at the tool'}</span>
         </div>
       )}
       <div className="vp-overlay bl"><div className="vp-glass"><span className="vp-readout">TCP {tcp}</span></div></div>
+      <div className="vp-overlay br">
+        <div className="vp-glass" data-tour="vp-controls">
+          <label className="vp-speed" title="Simulation speed">
+            <span>Sim speed</span>
+            <select value={speed} aria-label="Simulation speed" onChange={(e) => { const v = +e.target.value; host.setSpeed(v); logEvent('speed_change', { speed: v }); }}>
+              {SPEEDS.map((s) => <option key={s} value={s}>{s}×</option>)}
+            </select>
+          </label>
+          <button className="btn sm ghost" onClick={() => host.reset()} title="Put every part back where it started"><Icon.reset width={13} height={13} /> Reset</button>
+        </div>
+      </div>
       {fault && !showSuccess && (
         <div className="fault-card" role="alert">
           <div className="row"><span className="code">PROTECTIVE STOP · {fault.code}</span><span className="grow" />
@@ -101,6 +133,7 @@ export function Viewport({ onAskAgent }: { onAskAgent?: () => void }) {
           <div className="muted">{FAULT_HELP[fault.code]}{fault.line && editor === 'code' ? ` · line ${fault.line}` : fault.blockId ? ' · the block is marked in your program' : ''}</div>
           <div className="row" style={{ marginTop: 4 }}>
             <button className="btn sm" onClick={() => { host.reset(); }}><Icon.reset /> Reset scene</button>
+            {(fault.blockId || fault.line) && <button className="btn sm" onClick={() => go('program')}><Icon.blocks /> Show in program</button>}
             {onAskAgent && <button className="btn sm aqua" onClick={onAskAgent}><Icon.sparkle /> Ask AI partner about this</button>}
           </div>
         </div>

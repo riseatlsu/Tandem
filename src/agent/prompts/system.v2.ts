@@ -1,10 +1,12 @@
 import { STEP_SCHEMA_DOC } from '../../blocks/steps';
+import type { AgentFeatures } from '../../store';
 
-export const PROMPT_VERSION = 'sys-v1';
+export const PROMPT_VERSION = 'sys-v2';
 
 export interface PromptCtx {
   taskTitle: string; taskBrief: string; armName: string; editor: 'blocks' | 'code'; mode: 'qa' | 'suggest';
   targets: string[]; inputs: string[]; outputs: string[];
+  features: AgentFeatures;
 }
 
 export function systemPrompt(c: PromptCtx): string {
@@ -34,5 +36,17 @@ Good practice: moveJ to an approach point above, moveL down, act, moveL back up.
 ${c.mode === 'suggest' ? `- You MAY change the program, but only by calling propose_patch. The user previews and accepts or rejects it, and nothing changes without their click. Call dry_run first and fix problems until the dry run completes without faults, then propose. After proposing, briefly say what changed and why. Don't paste the whole program into chat.
 - You cannot press Run, teach targets, or move the robot. If a target is missing, tell the user exactly where to jog and what name to teach.
 ${c.editor === 'blocks' ? `- The user works in BLOCKS. Programs you read and propose are JSON "steps":\n${STEP_SCHEMA_DOC}\n- In propose_patch and dry_run, pass {"steps": [...]} (the whole program, top to bottom). Do not write JavaScript for a blocks user.` : `- The user works in CODE. In propose_patch and dry_run, pass {"program": "<full JavaScript program>"}.`}` : `- You are in Q&A mode: explain, teach and point out bugs, but you cannot change the program. Describe what the user should change (which block or line), and include short snippets if useful.`}
-- Encourage learning: explain the why in one line (e.g. why a straight-line approach avoids collisions).`;
+- Encourage learning: explain the why in one line (e.g. why a straight-line approach avoids collisions).${visualSection(c)}`;
+}
+
+function visualSection(c: PromptCtx): string {
+  const f = c.features;
+  const lines: string[] = [];
+  if (f.visuals) {
+    lines.push('- Show, don\'t just tell. When the user asks how to build something, call show_blocks with the few blocks they need (a picture beats a list of block names), even in code mode if a pattern is easier to see as blocks.');
+    lines.push('- When a physical skill is involved (jogging, teaching, hand guiding, running, conveyor waits, loops, recovering from faults), call show_example with the matching GIF. One visual per reply is usually enough; skip it for quick factual answers.');
+  }
+  if (f.plans) lines.push('- When the user is starting a task or seems lost, call make_plan with 3–7 concrete steps and checks. Read the plan in read_task to see what is already done, and refer to the next open step. Do not remake a plan unless the approach changes.');
+  if (f.preview && c.mode === 'suggest') lines.push('- After propose_patch succeeds, call preview_proposal so the user can watch a ghost robot perform it before deciding.');
+  return lines.length ? `\n\n## Visual help\n${lines.join('\n')}` : '';
 }
