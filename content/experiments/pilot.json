@@ -1,0 +1,13 @@
+{
+  "id": "pilot",
+  "version": "1",
+  "conditions": {
+    "suggest": { "agent": { "mode": "suggest", "model": "gpt-5-mini", "promptVersion": "sys-v1" }, "taskSequence": ["tut-jog-teach", "factory-pick-one", "kitchen-pour"] },
+    "qa": { "agent": { "mode": "qa", "model": "gpt-5-mini", "promptVersion": "sys-v1" }, "taskSequence": ["tut-jog-teach", "factory-pick-one", "kitchen-pour"] },
+    "off": { "agent": { "mode": "off", "promptVersion": "sys-v1" }, "taskSequence": ["tut-jog-teach", "factory-pick-one", "kitchen-pour"] }
+  },
+  "assignment": "byCode",
+  "counterbalance": { "method": "latinSquare", "over": "taskSequence", "fixedPrefix": 1 },
+  "postSurveyUrl": "https://example.org/post-survey",
+  "logging": { "telemetry": true, "snapshotDebounceMs": 2000 }
+}

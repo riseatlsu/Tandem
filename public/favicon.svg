@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Tandem">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8fdcff"/>
+      <stop offset="0.55" stop-color="#2d9bf0"/>
+      <stop offset="1" stop-color="#0f63c9"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="1.05" r="0.75">
+      <stop offset="0" stop-color="#7ff2d0" stop-opacity="0.95"/>
+      <stop offset="0.6" stop-color="#37c6e8" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#37c6e8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0.05"/>
+    </linearGradient>
+    <radialGradient id="orb" cx="0.38" cy="0.32" r="0.75">
+      <stop offset="0" stop-color="#eaffd9"/>
+      <stop offset="0.35" stop-color="#98ec6a"/>
+      <stop offset="1" stop-color="#22a447"/>
+    </radialGradient>
+    <linearGradient id="arm" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e3f1ff"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-color="#06386f" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="url(#sky)"/>
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="url(#glow)"/>
+  <g filter="url(#soft)" fill="none" stroke="url(#arm)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M30 98 h28" stroke-width="9"/>
+    <path d="M44 94 L44 80 L62 46 L90 62" stroke-width="11"/>
+  </g>
+  <g filter="url(#soft)">
+    <circle cx="44" cy="80" r="8.5" fill="#ffffff"/>
+    <circle cx="62" cy="46" r="9.5" fill="#ffffff"/>
+    <circle cx="44" cy="80" r="3.4" fill="#2d9bf0"/>
+    <circle cx="62" cy="46" r="3.8" fill="#2d9bf0"/>
+    <path d="M88 56 l9 -4 M88 68 l9 4" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="104" cy="62" r="10" fill="url(#orb)"/>
+    <ellipse cx="101" cy="57.5" rx="5" ry="3" fill="#fff" opacity="0.75"/>
+  </g>
+  <path d="M4 34 C4 18 18 4 34 4 H94 C110 4 124 18 124 34 V44 C96 56 34 56 4 44 Z" fill="url(#gloss)" opacity="0.55"/>
+</svg>

@@ -1,0 +1,53 @@
+{
+  "name": "tandem",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run docs:index && tsc --noEmit -p . && vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:functions": "cd functions && npm test",
+    "emulators": "firebase emulators:start",
+    "docs:index": "tsx scripts/build-docs-index.ts",
+    "codes:gen": "tsx scripts/gen-codes.ts",
+    "logs:export": "tsx scripts/export-logs.ts",
+    "mock-llm": "tsx tests/fixtures/mock-llm/server.ts"
+  },
+  "dependencies": {
+    "@langchain/core": "^1.4.2",
+    "@langchain/langgraph": "^1.7.5",
+    "@langchain/openai": "^1.8.4",
+    "blockly": "^13.5.0",
+    "firebase": "^13.4.0",
+    "idb-keyval": "^6.3.0",
+    "monaco-editor": "^0.57.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.187.0",
+    "zod": "^4.6.7",
+    "zustand": "^5.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.65.1",
+    "@types/node": "^26.6.6",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@types/three": "^0.187.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "eslint": "^10.15.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "firebase-admin": "^14.5.1",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.73.0",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1"
+  }
+}

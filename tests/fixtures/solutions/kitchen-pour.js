@@ -1,0 +1,17 @@
+await robot.home();
+await gripper.open();
+await robot.moveJ('pitcher.lift');
+await robot.moveL('pitcher.grasp');
+await gripper.close();
+await robot.moveL('pitcher.lift');
+await robot.moveJ('cup.above');
+const pour = offset('cup.above', 0, 0, -40);
+await robot.moveL(pour);
+await robot.moveL({ ...pour, rx: -70 }, { speed: 30 });
+await robot.wait(500);
+await robot.moveL(pour, { speed: 30 });
+await robot.moveJ('pitcher.lift');
+await robot.moveL('pitcher.grasp');
+await gripper.open();
+await robot.moveL('pitcher.lift');
+await robot.home();

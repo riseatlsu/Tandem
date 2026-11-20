@@ -1,0 +1,8 @@
+{
+  "id": "palletize-2x2x2", "title": "Palletize 2×2×2", "sceneId": "palletize-sort", "armId": "gofa-like", "seed": 7,
+  "editor": "code", "passOn": "run",
+  "brief": "Stack eight cubes on the pallet in a **2 × 2** grid, **2 layers** high. Cubes are 50 mm; use a 70 mm pitch.\n\n`offset(target, dx, dy, dz)` returns a pose shifted from a target — perfect for grids. `pallet.corner` is the first slot on the bottom layer.",
+  "predicates": [{ "type": "stackPattern", "region": "pallet", "kind": "part", "rows": 2, "cols": 2, "layers": 2, "label": "2×2×2 stack on the pallet" }, { "type": "programCompleted" }, { "type": "noFaults" }],
+  "conveyorOverrides": { "infeed": { "count": 8, "colors": ["orange"], "intervalSec": 3, "jitterSec": 0 } },
+  "starter": { "code": "await robot.home();\nconst pitch = 70;\n\nfor (let layer = 0; layer < 2; layer++) {\n  for (let row = 0; row < 2; row++) {\n    for (let col = 0; col < 2; col++) {\n      // pick the next cube, then place it at\n      // offset('pallet.corner', col * pitch, row * pitch, layer * 50)\n    }\n  }\n}\n" }
+}

@@ -1,0 +1,112 @@
+{
+  "id": "gofa-like",
+  "name": "Aria 5 (GoFa-class cobot)",
+  "kind": "articulated6",
+  "dh": [
+    {
+      "theta": 0,
+      "d": 0.265,
+      "a": 0,
+      "alpha": -1.5707963267948966
+    },
+    {
+      "theta": -1.5707963267948966,
+      "d": 0,
+      "a": 0.444,
+      "alpha": 0
+    },
+    {
+      "theta": 0,
+      "d": 0,
+      "a": 0.11,
+      "alpha": -1.5707963267948966
+    },
+    {
+      "theta": 0,
+      "d": 0.47,
+      "a": 0,
+      "alpha": 1.5707963267948966
+    },
+    {
+      "theta": 0,
+      "d": 0,
+      "a": 0,
+      "alpha": -1.5707963267948966
+    },
+    {
+      "theta": 0,
+      "d": 0.101,
+      "a": 0,
+      "alpha": 0
+    }
+  ],
+  "jointLimitsDeg": [
+    {
+      "min": -270,
+      "max": 270,
+      "maxVel": 125
+    },
+    {
+      "min": -180,
+      "max": 180,
+      "maxVel": 125
+    },
+    {
+      "min": -225,
+      "max": 85,
+      "maxVel": 140
+    },
+    {
+      "min": -180,
+      "max": 180,
+      "maxVel": 140
+    },
+    {
+      "min": -180,
+      "max": 180,
+      "maxVel": 140
+    },
+    {
+      "min": -270,
+      "max": 270,
+      "maxVel": 140
+    }
+  ],
+  "tool": {
+    "x": 0,
+    "y": 0,
+    "z": 140,
+    "rx": 0,
+    "ry": 0,
+    "rz": 0
+  },
+  "homeDeg": [
+    0,
+    0,
+    0,
+    0,
+    90,
+    0
+  ],
+  "maxTcpSpeed": 1500,
+  "linkRadius": [
+    70,
+    65,
+    55,
+    50,
+    45,
+    40,
+    38,
+    35
+  ],
+  "visual": {
+    "source": "procedural",
+    "color": "#f4f6f8",
+    "accent": "#8a96a3"
+  },
+  "gripper": {
+    "stroke": 60,
+    "graspTolerance": 15,
+    "alignTolDeg": 15
+  }
+}

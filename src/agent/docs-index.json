@@ -1,0 +1,158 @@
+[
+ {
+  "id": "api-reference#0",
+  "doc": "api-reference",
+  "title": "Robot API reference",
+  "text": "Programs are the body of an async function: they run top to bottom, and every robot call must be awaited (`await robot.moveJ('P1')`). Units are millimeters and degrees. Poses are `{x, y, z, rx, ry, rz}` in the robot base frame, with orientation R = Rx(rx)·Ry(ry)·Rz(rz). A tool pointing straight down is `rx: 180, ry: 0`."
+ },
+ {
+  "id": "api-reference#1",
+  "doc": "api-reference",
+  "title": "robot.moveJ(target, opts?)",
+  "text": "Joint move. Every joint moves at once along the fastest path, so the tool does not follow a straight line. `target` is a target name (string) or a pose. For a taught target, the stored joint configuration is reused exactly. Use it for large moves between approach points. `opts.speed` is 1–100 percent (default 50)."
+ },
+ {
+  "id": "api-reference#2",
+  "doc": "api-reference",
+  "title": "robot.moveL(target, opts?)",
+  "text": "Linear move. The tool travels in a straight line with its orientation interpolated. Use it for the last few centimeters of approach and retreat (pick, place, insert). It can fault with SINGULARITY when the path passes near a singular configuration, or with UNREACHABLE when part of the line leaves the workspace."
+ },
+ {
+  "id": "api-reference#3",
+  "doc": "api-reference",
+  "title": "robot.moveJoints(jointsDeg, opts?)",
+  "text": "Move to explicit joint angles, in degrees (millimeters for a prismatic joint). The array length must equal the number of joints."
+ },
+ {
+  "id": "api-reference#4",
+  "doc": "api-reference",
+  "title": "robot.home(opts?)",
+  "text": "Joint move to the arm's home configuration."
+ },
+ {
+  "id": "api-reference#5",
+  "doc": "api-reference",
+  "title": "robot.getPose() / robot.getJoints()",
+  "text": "Return the current tool pose, or the joint angles in degrees."
+ },
+ {
+  "id": "api-reference#6",
+  "doc": "api-reference",
+  "title": "robot.wait(ms)",
+  "text": "Wait in simulated time."
+ },
+ {
+  "id": "api-reference#7",
+  "doc": "api-reference",
+  "title": "gripper.open() / gripper.close() / gripper.holding()",
+  "text": "Closing takes 0.4 s. A part is picked up only if the tool center point (TCP, between the fingertips) is within about 15 mm of the part's vertical axis, sits between the bottom 10% and the top of the part, and the gripper is aligned with the part's up axis (pointing down onto it, within 15°). The part must also be narrower than the gripper stroke (60 mm). `holding()` returns the part id or null. Opening releases the part, which drops straight down onto whatever is below it."
+ },
+ {
+  "id": "api-reference#8",
+  "doc": "api-reference",
+  "title": "io.get(name) / io.set(name, value) / io.waitFor(name, value, timeoutMs?)",
+  "text": "Digital and text signals. Inputs come from sensors, e.g. `part_present` (true when a part waits at the end of the conveyor) and `part_color` ('red' | 'green' | 'blue' | 'none'). Outputs drive equipment, e.g. `conveyor_run`. `waitFor` blocks until the input equals the value. If `timeoutMs` is given and runs out, it faults with TIMEOUT."
+ },
+ {
+  "id": "api-reference#9",
+  "doc": "api-reference",
+  "title": "targets.get(name) / targets.list()",
+  "text": "Read target poses (a copy), or list every target name, taught and cell-defined."
+ },
+ {
+  "id": "api-reference#10",
+  "doc": "api-reference",
+  "title": "offset(target, dx, dy, dz)",
+  "text": "Returns a pose shifted in the base frame by dx, dy, dz millimeters. Use it for approach points (`offset('pick', 0, 0, 120)`) and grids (`offset('pallet.corner', col * 70, row * 70, layer * 50)`). It is synchronous, so don't await it."
+ },
+ {
+  "id": "api-reference#11",
+  "doc": "api-reference",
+  "title": "log(...values)",
+  "text": "Print to the Console tab."
+ },
+ {
+  "id": "blocks-reference#12",
+  "doc": "blocks-reference",
+  "title": "Block reference",
+  "text": "Programs start at the \"▶ When Run is pressed\" block. Blocks that aren't attached below it are greyed out and ignored."
+ },
+ {
+  "id": "blocks-reference#13",
+  "doc": "blocks-reference",
+  "title": "Motion",
+  "text": "- Go home (speed %): joint move to the home configuration.\n- Move to [target] [joint move | straight line] speed %: a joint move is fastest; a straight line keeps the tool on a line, for approach and retreat. The target dropdown lists taught and cell targets, and \"＋ Teach current pose…\" teaches a new target directly from the dropdown.\n- Move to [target] shifted by X Y Z mm: moves to a target offset in the base frame, for approach heights and grids. X, Y and Z accept numbers, variables and arithmetic blocks."
+ },
+ {
+  "id": "blocks-reference#14",
+  "doc": "blocks-reference",
+  "title": "Gripper",
+  "text": "- Open gripper / Close gripper: a part between the fingers is picked up on close.\n- If the gripper is holding a part … otherwise …"
+ },
+ {
+  "id": "blocks-reference#15",
+  "doc": "blocks-reference",
+  "title": "Signals",
+  "text": "- Wait until [input] is [value] (timeout s, 0 = forever): e.g. wait until part_present is true.\n- If [input] is [value] … otherwise …: e.g. if part_color is red.\n- Set [output] to [value]: e.g. set conveyor_run to false.\n- sensor [input]: the current value, for use in comparisons."
+ },
+ {
+  "id": "blocks-reference#16",
+  "doc": "blocks-reference",
+  "title": "Flow",
+  "text": "- Repeat N times; count with i from A to B (variable i); repeat while; if.\n- Wait N seconds; Show message (prints to the Console); note (a comment, does nothing)."
+ },
+ {
+  "id": "blocks-reference#17",
+  "doc": "blocks-reference",
+  "title": "Data and variables",
+  "text": "Number, arithmetic, text and true/false blocks, plus variables (create in the Variables category)."
+ },
+ {
+  "id": "concepts#18",
+  "doc": "concepts",
+  "title": "Teaching targets",
+  "text": "Jog the arm, or switch on Hand guide and drag the handle at the tool, then press Teach. That saves the current tool pose and joint configuration as a named target (P1, P2, …; double-click to rename). Cell targets such as `pick` or `bin.drop` are predefined by the scene and are read-only. Programs refer to targets by name."
+ },
+ {
+  "id": "concepts#19",
+  "doc": "concepts",
+  "title": "Joint move vs linear move",
+  "text": "A joint move (moveJ, \"joint move\" in blocks) is fast and robust but follows a curved path. A linear move (moveL, \"straight line\") keeps the tool on a straight line, which is needed for approach and retreat near parts and fixtures. The usual pattern is: moveJ to an approach point above the part, moveL down, close the gripper, moveL back up."
+ },
+ {
+  "id": "concepts#20",
+  "doc": "concepts",
+  "title": "Faults (protective stops)",
+  "text": "Every move is checked before the robot moves. If a check fails, the robot does not move, the program stops, and the faulting line or block is highlighted.\n- UNREACHABLE: the target, or part of the line, is outside the workspace. Move the target closer, raise it, or use a different orientation.\n- JOINT_LIMIT: a joint would exceed its limit. Re-teach the target with a different arm configuration.\n- SINGULARITY: a linear move passes through a singular configuration (e.g. wrist axes aligned), so a joint would flip. Use moveJ, or move through an intermediate point.\n- COLLISION: the arm, gripper or held part would hit a fixture (table, conveyor, bin walls). Add an approach point higher up.\n- INVALID_ARG: unknown target or signal name, or a bad value.\n- TIMEOUT: an io.waitFor timed out.\n- RUNAWAY: the program looped for 3 s of real time without commanding the robot. Add a wait or a motion inside the loop.\n- USER_ERROR: a JavaScript error, such as a typo or an undefined variable."
+ },
+ {
+  "id": "concepts#21",
+  "doc": "concepts",
+  "title": "Simulated time",
+  "text": "Simulated time only advances while a robot command executes (moves, waits, gripper actions). The conveyor and sensors run on simulated time. The speed slider changes how fast the simulation plays, never the outcome."
+ },
+ {
+  "id": "concepts#22",
+  "doc": "concepts",
+  "title": "Conveyors and sensors",
+  "text": "Parts spawn at the start of the belt while `conveyor_run` is true and stop at the end sensor, where `part_present` becomes true. Always wait for `part_present` before picking. Parts arrive one by one; after you pick one, the next moves up to the sensor."
+ },
+ {
+  "id": "concepts#23",
+  "doc": "concepts",
+  "title": "Grasping",
+  "text": "Approach from straight above (tool pointing down, `rx: 180`), lower with a linear move so the TCP is around the middle of the part, then close. Picked parts follow the gripper exactly. On release, a part drops straight down onto the highest surface below it. Parts can be stacked; a part tilted more than 30° when released topples over."
+ },
+ {
+  "id": "concepts#24",
+  "doc": "concepts",
+  "title": "Pouring (kitchen cell)",
+  "text": "Containers have a fill level. Tilting a held container more than 90° from upright pours. Flow grows with tilt, reaching full rate at 120°. Liquid lands in a container if the lip is within 40 mm (horizontally) above it; otherwise it spills. With the tool pointing down (`rx: 180`), setting `rx: -70` tilts the container by 110° toward −y. Return containers upright."
+ },
+ {
+  "id": "concepts#25",
+  "doc": "concepts",
+  "title": "Palletizing patterns",
+  "text": "Use nested loops with offset(): `for (let row = 0; row < 2; row++) for (let col = 0; col < 2; col++) { ... offset('pallet.corner', col * pitch, row * pitch, layer * height) ... }`. Approach every slot from above with an offset in z."
+ }
+]

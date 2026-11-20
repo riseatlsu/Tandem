@@ -1,0 +1,251 @@
+{
+  "id": "kitchen-lab",
+  "title": "Kitchen & Lab Bench",
+  "environment": "kitchen",
+  "fixtures": [
+    {
+      "id": "counter",
+      "kind": "box",
+      "center": [
+        250,
+        0,
+        -20
+      ],
+      "size": [
+        1500,
+        1400,
+        40
+      ],
+      "color": "#f7f3ec",
+      "mount": true
+    },
+    {
+      "id": "tube_tray",
+      "kind": "box",
+      "center": [
+        450,
+        -300,
+        6
+      ],
+      "size": [
+        160,
+        80,
+        12
+      ],
+      "color": "#cbd5e1",
+      "label": "Tray"
+    },
+    {
+      "id": "rack",
+      "kind": "rack",
+      "center": [
+        450,
+        320,
+        30
+      ],
+      "size": [
+        190,
+        60,
+        60
+      ],
+      "wall": 6,
+      "color": "#60a5fa",
+      "label": "Rack"
+    },
+    {
+      "id": "coaster",
+      "kind": "box",
+      "center": [
+        520,
+        0,
+        3
+      ],
+      "size": [
+        100,
+        100,
+        6
+      ],
+      "color": "#d6c3a5",
+      "label": "Coaster"
+    }
+  ],
+  "objects": [
+    {
+      "id": "pitcher",
+      "kind": "pitcher",
+      "shape": "cylinder",
+      "size": [
+        58,
+        58,
+        150
+      ],
+      "position": [
+        300,
+        -60,
+        0
+      ],
+      "color": "#93c5fd",
+      "container": {
+        "capacity": 500,
+        "fill": 0.8
+      }
+    },
+    {
+      "id": "cup1",
+      "kind": "cup",
+      "shape": "cylinder",
+      "size": [
+        56,
+        56,
+        90
+      ],
+      "position": [
+        520,
+        0,
+        6
+      ],
+      "color": "#fde68a",
+      "container": {
+        "capacity": 250,
+        "fill": 0
+      }
+    },
+    {
+      "id": "tube1",
+      "kind": "tube",
+      "shape": "cylinder",
+      "size": [
+        16,
+        16,
+        100
+      ],
+      "position": [
+        400,
+        -300,
+        12
+      ],
+      "color": "#c084fc"
+    },
+    {
+      "id": "tube2",
+      "kind": "tube",
+      "shape": "cylinder",
+      "size": [
+        16,
+        16,
+        100
+      ],
+      "position": [
+        450,
+        -300,
+        12
+      ],
+      "color": "#f472b6"
+    },
+    {
+      "id": "tube3",
+      "kind": "tube",
+      "shape": "cylinder",
+      "size": [
+        16,
+        16,
+        100
+      ],
+      "position": [
+        500,
+        -300,
+        12
+      ],
+      "color": "#34d399"
+    }
+  ],
+  "regions": [
+    {
+      "id": "rack",
+      "center": [
+        450,
+        320,
+        60
+      ],
+      "size": [
+        180,
+        50,
+        120
+      ],
+      "label": "Tube rack"
+    },
+    {
+      "id": "coaster",
+      "center": [
+        520,
+        0,
+        50
+      ],
+      "size": [
+        90,
+        90,
+        100
+      ],
+      "label": "Coaster"
+    }
+  ],
+  "io": {
+    "inputs": [],
+    "outputs": []
+  },
+  "conveyors": [],
+  "sceneTargets": {
+    "pitcher.grasp": {
+      "x": 300,
+      "y": -60,
+      "z": 90,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    },
+    "pitcher.lift": {
+      "x": 300,
+      "y": -60,
+      "z": 260,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    },
+    "cup.above": {
+      "x": 520,
+      "y": 56,
+      "z": 200,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    },
+    "tube1.grasp": {
+      "x": 400,
+      "y": -300,
+      "z": 80,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    },
+    "rack.slot1": {
+      "x": 400,
+      "y": 320,
+      "z": 76,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    }
+  },
+  "camera": {
+    "position": [
+      1350,
+      -1150,
+      850
+    ],
+    "target": [
+      420,
+      0,
+      200
+    ]
+  }
+}

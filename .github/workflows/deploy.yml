@@ -1,0 +1,50 @@
+name: Deploy
+on:
+  push: { branches: [main] }
+  workflow_dispatch:
+permissions: { contents: read, pages: write, id-token: write }
+concurrency: { group: deploy, cancel-in-progress: false }
+jobs:
+  pages:
+    runs-on: ubuntu-latest
+    environment: { name: github-pages, url: '${{ steps.deployment.outputs.page_url }}' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_BASE: /${{ github.event.repository.name }}/
+          VITE_APP_VERSION: ${{ github.sha }}
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_LLM_PROXY_URL: ${{ vars.VITE_LLM_PROXY_URL }}
+          VITE_FUNCTIONS_URL: ${{ vars.VITE_FUNCTIONS_URL }}
+          VITE_DEMO_MODELS: ${{ vars.VITE_DEMO_MODELS }}
+      - run: cp dist/index.html dist/404.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: dist }
+      - id: deployment
+        uses: actions/deploy-pages@v4
+  firebase:
+    if: ${{ vars.VITE_FIREBASE_PROJECT_ID != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+        working-directory: functions
+      - run: npm i -g firebase-tools
+      - name: Write service account
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "${{ runner.temp }}/sa.json"
+      - name: Function environment (allowed origins, IP salt)
+        run: |
+          printf 'ALLOWED_ORIGINS=%s\nIP_SALT=%s\n' "${{ vars.ALLOWED_ORIGINS }}" "${{ secrets.IP_SALT }}" > "functions/.env.${{ vars.VITE_FIREBASE_PROJECT_ID }}"
+      - name: Deploy functions + Firestore rules
+        run: firebase deploy --only functions,firestore:rules --project "${{ vars.VITE_FIREBASE_PROJECT_ID }}" --non-interactive --force
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json

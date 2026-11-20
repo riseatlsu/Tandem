@@ -1,0 +1,219 @@
+{
+  "id": "factory-pick",
+  "title": "Assembly Cell",
+  "environment": "factory",
+  "fixtures": [
+    {
+      "id": "table",
+      "kind": "box",
+      "center": [
+        250,
+        0,
+        -20
+      ],
+      "size": [
+        1500,
+        1400,
+        40
+      ],
+      "color": "#e9eef3",
+      "mount": true
+    },
+    {
+      "id": "conveyor",
+      "kind": "conveyor",
+      "center": [
+        180,
+        -420,
+        40
+      ],
+      "size": [
+        760,
+        170,
+        80
+      ],
+      "color": "#3d4652"
+    },
+    {
+      "id": "fixture_plate",
+      "kind": "box",
+      "center": [
+        450,
+        250,
+        10
+      ],
+      "size": [
+        200,
+        200,
+        20
+      ],
+      "color": "#9fb4c8",
+      "label": "Fixture"
+    },
+    {
+      "id": "reject_bin",
+      "kind": "bin",
+      "center": [
+        130,
+        430,
+        60
+      ],
+      "size": [
+        220,
+        220,
+        120
+      ],
+      "wall": 8,
+      "color": "#f59e0b",
+      "label": "Bin"
+    }
+  ],
+  "objects": [],
+  "regions": [
+    {
+      "id": "plate",
+      "center": [
+        450,
+        250,
+        45
+      ],
+      "size": [
+        120,
+        120,
+        60
+      ],
+      "label": "Fixture plate"
+    },
+    {
+      "id": "bin",
+      "center": [
+        130,
+        430,
+        150
+      ],
+      "size": [
+        210,
+        210,
+        300
+      ],
+      "label": "Reject bin"
+    },
+    {
+      "id": "conveyor_end",
+      "center": [
+        450,
+        -420,
+        105
+      ],
+      "size": [
+        60,
+        60,
+        60
+      ]
+    }
+  ],
+  "io": {
+    "inputs": [
+      {
+        "name": "part_present",
+        "initial": false
+      }
+    ],
+    "outputs": [
+      {
+        "name": "conveyor_run",
+        "initial": true
+      },
+      {
+        "name": "light",
+        "initial": false
+      }
+    ]
+  },
+  "conveyors": [
+    {
+      "id": "infeed",
+      "start": [
+        -180,
+        -420,
+        80
+      ],
+      "end": [
+        450,
+        -420,
+        80
+      ],
+      "speed": 150,
+      "runOutput": "conveyor_run",
+      "sensorInput": "part_present",
+      "spawn": {
+        "intervalSec": 5,
+        "jitterSec": 0,
+        "count": 1,
+        "colors": [
+          "blue"
+        ],
+        "size": [
+          50,
+          50,
+          50
+        ],
+        "kind": "part"
+      }
+    }
+  ],
+  "sceneTargets": {
+    "pick.approach": {
+      "x": 450,
+      "y": -420,
+      "z": 230,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    },
+    "pick": {
+      "x": 450,
+      "y": -420,
+      "z": 105,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    },
+    "place.approach": {
+      "x": 450,
+      "y": 250,
+      "z": 200,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    },
+    "place": {
+      "x": 450,
+      "y": 250,
+      "z": 46,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    },
+    "bin.drop": {
+      "x": 130,
+      "y": 430,
+      "z": 220,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    }
+  },
+  "camera": {
+    "position": [
+      1650,
+      -1450,
+      1150
+    ],
+    "target": [
+      260,
+      -20,
+      280
+    ]
+  }
+}

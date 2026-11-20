@@ -1,0 +1,266 @@
+/**
+ * Wizard-style "easy programming" blocks (original design). Every block compiles to the
+ * same robot API that the code editor uses (see robot-api.d.ts).
+ */
+import * as Blockly from 'blockly';
+import { javascriptGenerator, Order } from 'blockly/javascript';
+
+export interface BlockEnv {
+  targetNames(): string[];
+  inputs(): { name: string; initial: boolean | string }[];
+  outputs(): { name: string; initial: boolean | string }[];
+  teach(): string | null;
+}
+let env: BlockEnv = { targetNames: () => [], inputs: () => [], outputs: () => [], teach: () => null };
+export const setBlockEnv = (e: BlockEnv) => { env = e; };
+
+export const CATEGORY_COLORS = { motion: '#2d8cf0', gripper: '#12b5a5', signals: '#f39c12', flow: '#8b5cf6', data: '#2fb84a', start: '#1a8cff' };
+const TEACH = '__TEACH__';
+
+function targetDropdown(): Blockly.FieldDropdown {
+  const field = new Blockly.FieldDropdown(function (this: Blockly.FieldDropdown) {
+    const names = env.targetNames();
+    const cur = this.getValue?.();
+    const opts: [string, string][] = names.map((n) => [n, n]);
+    if (cur && cur !== TEACH && !names.includes(cur)) opts.unshift([`${cur} (missing)`, cur]);
+    if (!opts.length) opts.push(['(no targets yet)', '']);
+    opts.push(['＋ Teach current pose…', TEACH]);
+    return opts;
+  }, function (v: string) {
+    if (v === TEACH) {
+      const n = env.teach();
+      return n ?? null;
+    }
+    return v;
+  });
+  return field;
+}
+function ioDropdown(kind: 'inputs' | 'outputs') {
+  return new Blockly.FieldDropdown(() => {
+    const l = env[kind]();
+    return l.length ? l.map((i) => [i.name, i.name] as [string, string]) : [['(none in this cell)', '']];
+  });
+}
+
+export const BLOCK_TYPES = [
+  'program_start', 'robot_home', 'robot_move', 'robot_move_offset', 'gripper_open', 'gripper_close', 'gripper_if_holding',
+  'io_wait_until', 'io_set', 'io_if', 'io_value', 'flow_wait', 'flow_log', 'flow_note',
+  'controls_repeat_ext', 'controls_whileUntil', 'controls_if', 'controls_for', 'logic_compare', 'logic_boolean', 'logic_operation', 'logic_negate',
+  'math_number', 'math_arithmetic', 'text', 'variables_get', 'variables_set', 'math_change',
+] as const;
+
+let defined = false;
+export function defineBlocks() {
+  if (defined) return;
+  defined = true;
+  const C = CATEGORY_COLORS;
+
+  Blockly.Blocks['program_start'] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField('▶  When Run is pressed');
+      this.setNextStatement(true);
+      this.setColour(C.start);
+      this.setDeletable(false);
+      this.setTooltip('Your program starts here. Blocks that are not attached below this are ignored.');
+      (this as unknown as { hat: string }).hat = 'cap';
+    },
+  };
+  Blockly.Blocks['robot_home'] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField('🏠  Go home').appendField('speed').appendField(new Blockly.FieldNumber(50, 1, 100, 1), 'SPEED').appendField('%');
+      this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.motion);
+      this.setTooltip('Move every joint back to the home position.');
+    },
+  };
+  Blockly.Blocks['robot_move'] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput()
+        .appendField('➜  Move to').appendField(targetDropdown(), 'TARGET')
+        .appendField(new Blockly.FieldDropdown([['joint move', 'J'], ['straight line', 'L']]), 'MODE')
+        .appendField('speed').appendField(new Blockly.FieldNumber(50, 1, 100, 1), 'SPEED').appendField('%');
+      this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.motion);
+      this.setTooltip('Move the tool to a taught target. A joint move is fastest; a straight line keeps the tool on a line (use it for approach and retreat).');
+    },
+  };
+  Blockly.Blocks['robot_move_offset'] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField('➜  Move to').appendField(targetDropdown(), 'TARGET').appendField('shifted by');
+      this.appendValueInput('DX').setCheck('Number').appendField('X');
+      this.appendValueInput('DY').setCheck('Number').appendField('Y');
+      this.appendValueInput('DZ').setCheck('Number').appendField('Z');
+      this.appendDummyInput().appendField('mm').appendField(new Blockly.FieldDropdown([['joint move', 'J'], ['straight line', 'L']]), 'MODE')
+        .appendField('speed').appendField(new Blockly.FieldNumber(50, 1, 100, 1), 'SPEED').appendField('%');
+      this.setInputsInline(true);
+      this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.motion);
+      this.setTooltip('Move to a target shifted in the base frame — useful for approach heights and grids.');
+    },
+  };
+  Blockly.Blocks['gripper_open'] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField('✋  Open gripper');
+      this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.gripper);
+    },
+  };
+  Blockly.Blocks['gripper_close'] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField('✊  Close gripper');
+      this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.gripper);
+      this.setTooltip('Close the fingers. A part between the fingers is picked up.');
+    },
+  };
+  Blockly.Blocks['gripper_if_holding'] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField('If the gripper is holding a part');
+      this.appendStatementInput('DO').appendField('then');
+      this.appendStatementInput('ELSE').appendField('otherwise');
+      this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.gripper);
+    },
+  };
+  Blockly.Blocks['io_wait_until'] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField('⏳  Wait until').appendField(ioDropdown('inputs'), 'INPUT').appendField('is').appendField(new Blockly.FieldTextInput('true'), 'VALUE')
+        .appendField('timeout').appendField(new Blockly.FieldNumber(0, 0, 3600, 1), 'TIMEOUT').appendField('s');
+      this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.signals);
+      this.setTooltip('Pause until a sensor reports a value. Timeout 0 waits forever.');
+    },
+  };
+  Blockly.Blocks['io_set'] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField('⚡  Set').appendField(ioDropdown('outputs'), 'OUTPUT').appendField('to').appendField(new Blockly.FieldTextInput('true'), 'VALUE');
+      this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.signals);
+    },
+  };
+  Blockly.Blocks['io_if'] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField('If').appendField(ioDropdown('inputs'), 'INPUT').appendField('is').appendField(new Blockly.FieldTextInput('true'), 'VALUE');
+      this.appendStatementInput('DO').appendField('then');
+      this.appendStatementInput('ELSE').appendField('otherwise');
+      this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.signals);
+    },
+  };
+  Blockly.Blocks['io_value'] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField('sensor').appendField(ioDropdown('inputs'), 'INPUT');
+      this.setOutput(true, null); this.setColour(C.signals);
+    },
+  };
+  Blockly.Blocks['flow_wait'] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField('⏱  Wait').appendField(new Blockly.FieldNumber(1, 0, 3600, 0.1), 'SEC').appendField('seconds');
+      this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.flow);
+    },
+  };
+  Blockly.Blocks['flow_log'] = {
+    init(this: Blockly.Block) {
+      this.appendValueInput('MSG').appendField('💬  Show message');
+      this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.flow);
+    },
+  };
+  Blockly.Blocks['flow_note'] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField('📝').appendField(new Blockly.FieldTextInput('note'), 'TEXT');
+      this.setPreviousStatement(true); this.setNextStatement(true); this.setColour('#94a3b8');
+      this.setTooltip('A note for humans. Does nothing when the program runs.');
+    },
+  };
+
+  // ---------- generator
+  const g = javascriptGenerator;
+  g.STATEMENT_PREFIX = 'await __hl(%1);\n';
+  g.addReservedWords('robot,gripper,io,targets,offset,log,__hl');
+  const lit = (v: string) => {
+    const t = v.trim();
+    if (t === 'true' || t === 'false') return t;
+    if (t !== '' && !isNaN(Number(t))) return String(Number(t));
+    return JSON.stringify(t);
+  };
+  const num = (b: Blockly.Block, name: string) => g.valueToCode(b, name, Order.ATOMIC) || '0';
+  g.forBlock['program_start'] = () => '';
+  g.forBlock['robot_home'] = (b) => `await robot.home({ speed: ${Number(b.getFieldValue('SPEED'))} });\n`;
+  g.forBlock['robot_move'] = (b) => `await robot.move${b.getFieldValue('MODE')}(${JSON.stringify(b.getFieldValue('TARGET'))}, { speed: ${Number(b.getFieldValue('SPEED'))} });\n`;
+  g.forBlock['robot_move_offset'] = (b) =>
+    `await robot.move${b.getFieldValue('MODE')}(offset(${JSON.stringify(b.getFieldValue('TARGET'))}, ${num(b, 'DX')}, ${num(b, 'DY')}, ${num(b, 'DZ')}), { speed: ${Number(b.getFieldValue('SPEED'))} });\n`;
+  g.forBlock['gripper_open'] = () => 'await gripper.open();\n';
+  g.forBlock['gripper_close'] = () => 'await gripper.close();\n';
+  g.forBlock['gripper_if_holding'] = (b) => `if (await gripper.holding()) {\n${g.statementToCode(b, 'DO')}} else {\n${g.statementToCode(b, 'ELSE')}}\n`;
+  g.forBlock['io_wait_until'] = (b) => {
+    const t = Number(b.getFieldValue('TIMEOUT'));
+    return `await io.waitFor(${JSON.stringify(b.getFieldValue('INPUT'))}, ${lit(b.getFieldValue('VALUE'))}${t > 0 ? `, ${t * 1000}` : ''});\n`;
+  };
+  g.forBlock['io_set'] = (b) => `await io.set(${JSON.stringify(b.getFieldValue('OUTPUT'))}, ${lit(b.getFieldValue('VALUE'))});\n`;
+  g.forBlock['io_if'] = (b) => `if ((await io.get(${JSON.stringify(b.getFieldValue('INPUT'))})) === ${lit(b.getFieldValue('VALUE'))}) {\n${g.statementToCode(b, 'DO')}} else {\n${g.statementToCode(b, 'ELSE')}}\n`;
+  g.forBlock['io_value'] = (b) => [`(await io.get(${JSON.stringify(b.getFieldValue('INPUT'))}))`, Order.ATOMIC];
+  g.forBlock['flow_wait'] = (b) => `await robot.wait(${Math.round(Number(b.getFieldValue('SEC')) * 1000)});\n`;
+  g.forBlock['flow_log'] = (b) => `log(${g.valueToCode(b, 'MSG', Order.NONE) || "''"});\n`;
+  g.forBlock['flow_note'] = (b) => `// ${String(b.getFieldValue('TEXT')).replace(/\n/g, ' ')}\n`;
+}
+
+export function makeTheme() {
+  return Blockly.Theme.defineTheme('tandem', {
+    name: 'tandem',
+    base: Blockly.Themes.Classic,
+    componentStyles: {
+      workspaceBackgroundColour: '#f6fbff',
+      toolboxBackgroundColour: '#f3f9ff',
+      toolboxForegroundColour: '#3a5372',
+      flyoutBackgroundColour: '#eef6ff',
+      flyoutForegroundColour: '#3a5372',
+      flyoutOpacity: 0.96,
+      scrollbarColour: '#c6d8ec',
+      scrollbarOpacity: 0.8,
+      insertionMarkerColour: '#1a8cff',
+      insertionMarkerOpacity: 0.35,
+      cursorColour: '#1a8cff',
+    },
+    blockStyles: {
+      loop_blocks: { colourPrimary: '#8b5cf6', colourSecondary: '#c4b5fd', colourTertiary: '#6d28d9' },
+      logic_blocks: { colourPrimary: '#8b5cf6', colourSecondary: '#c4b5fd', colourTertiary: '#6d28d9' },
+      math_blocks: { colourPrimary: '#2fb84a', colourSecondary: '#86efac', colourTertiary: '#15803d' },
+      text_blocks: { colourPrimary: '#2fb84a', colourSecondary: '#86efac', colourTertiary: '#15803d' },
+      variable_blocks: { colourPrimary: '#e0569b', colourSecondary: '#f9a8d4', colourTertiary: '#be185d' },
+      procedure_blocks: { colourPrimary: '#64748b', colourSecondary: '#cbd5e1', colourTertiary: '#334155' },
+    },
+    categoryStyles: {},
+    fontStyle: { family: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif', weight: '600', size: 12 },
+    startHats: true,
+  });
+}
+
+export function toolbox() {
+  const C = CATEGORY_COLORS;
+  const shadowNum = (n: number) => ({ shadow: { type: 'math_number', fields: { NUM: n } } });
+  return {
+    kind: 'categoryToolbox',
+    contents: [
+      { kind: 'category', name: 'Motion', colour: C.motion, contents: [
+        { kind: 'block', type: 'robot_home' },
+        { kind: 'block', type: 'robot_move' },
+        { kind: 'block', type: 'robot_move', fields: { MODE: 'L' } },
+        { kind: 'block', type: 'robot_move_offset', inputs: { DX: shadowNum(0), DY: shadowNum(0), DZ: shadowNum(100) } },
+      ] },
+      { kind: 'category', name: 'Gripper', colour: C.gripper, contents: [
+        { kind: 'block', type: 'gripper_open' }, { kind: 'block', type: 'gripper_close' }, { kind: 'block', type: 'gripper_if_holding' },
+      ] },
+      { kind: 'category', name: 'Signals', colour: C.signals, contents: [
+        { kind: 'block', type: 'io_wait_until' }, { kind: 'block', type: 'io_if' }, { kind: 'block', type: 'io_set' }, { kind: 'block', type: 'io_value' },
+      ] },
+      { kind: 'category', name: 'Flow', colour: C.flow, contents: [
+        { kind: 'block', type: 'controls_repeat_ext', inputs: { TIMES: shadowNum(3) } },
+        { kind: 'block', type: 'controls_for', inputs: { FROM: shadowNum(0), TO: shadowNum(2), BY: shadowNum(1) } },
+        { kind: 'block', type: 'controls_whileUntil' },
+        { kind: 'block', type: 'controls_if' },
+        { kind: 'block', type: 'logic_compare' },
+        { kind: 'block', type: 'flow_wait' },
+        { kind: 'block', type: 'flow_log', inputs: { MSG: { shadow: { type: 'text', fields: { TEXT: 'hello' } } } } },
+        { kind: 'block', type: 'flow_note' },
+      ] },
+      { kind: 'category', name: 'Data', colour: C.data, contents: [
+        { kind: 'block', type: 'math_number' },
+        { kind: 'block', type: 'math_arithmetic', inputs: { A: shadowNum(1), B: shadowNum(70) } },
+        { kind: 'block', type: 'text' },
+        { kind: 'block', type: 'logic_boolean' },
+      ] },
+      { kind: 'category', name: 'Variables', colour: '#e0569b', custom: 'VARIABLE' },
+    ],
+  };
+}

@@ -1,0 +1,6 @@
+{
+  "id": "lab-tubes", "title": "Rack the test tubes", "sceneId": "kitchen-lab", "armId": "gofa-like", "seed": 6,
+  "editor": "blocks", "passOn": "run",
+  "brief": "Move all three test tubes from the tray into the rack. The tubes stand 50 mm apart on the tray; space them the same way in the rack (`rack.slot1` is the first slot).",
+  "predicates": [{ "type": "countInRegion", "kind": "tube", "region": "rack", "count": 3, "label": "3 tubes in the rack" }, { "type": "upright", "object": "tube1" }, { "type": "upright", "object": "tube2" }, { "type": "upright", "object": "tube3" }, { "type": "programCompleted" }, { "type": "noFaults" }]
+}

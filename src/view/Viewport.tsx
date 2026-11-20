@@ -1,0 +1,117 @@
+import { useEffect, useRef, useState } from 'react';
+import { Scene3D } from './Scene3D';
+import { host } from '../simHost';
+import { useApp } from '../store';
+import { Icon } from '../ui/icons';
+import { logEvent } from '../study/logger';
+import { FAULT_HELP } from '../sim/types';
+import { ARMS } from '../content';
+
+export function Viewport({ onAskAgent }: { onAskAgent?: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<Scene3D | null>(null);
+  const handGuide = useApp((s) => s.handGuide);
+  const hgMode = useApp((s) => s.handGuideMode);
+  const blocked = useApp((s) => s.handGuideBlocked);
+  const showFrames = useApp((s) => s.showFrames);
+  const fault = useApp((s) => s.fault);
+  const showSuccess = useApp((s) => s.showSuccess);
+  const taskId = useApp((s) => s.taskId);
+  const armOverride = useApp((s) => s.armOverride);
+  const editor = useApp((s) => s.workspaces[s.taskId]?.editor);
+  const set = useApp((s) => s.set);
+  const [tcp, setTcp] = useState('');
+  const guideStats = useRef({ fails: 0, start: '' });
+
+  useEffect(() => {
+    if (!ref.current) return;
+    let lastCam = 0;
+    let lastRead = 0;
+    const s3 = new Scene3D(ref.current, {
+      onGuide: (m) => {
+        const ok = host.guideTo(m);
+        if (!ok) guideStats.current.fails++;
+        if (useApp.getState().handGuideBlocked !== !ok) set({ handGuideBlocked: !ok });
+        return ok;
+      },
+      onGuideStart: () => { guideStats.current = { fails: 0, start: JSON.stringify(host.sim.tcpPose()) }; logEvent('handguide_start', { pose: host.sim.tcpPose() }); },
+      onGuideEnd: () => { set({ handGuideBlocked: false }); logEvent('handguide_end', { pose: host.sim.tcpPose(), ikFailures: guideStats.current.fails }); },
+      onCameraMove: () => { const now = Date.now(); if (now - lastCam > 2000) { lastCam = now; logEvent('camera_move', { position: s3.camera.position.toArray().map((v) => +v.toFixed(2)) }); } },
+    }, (dt) => {
+      if (!host.sim) return null;
+      host.frame(dt);
+      const now = performance.now();
+      if (now - lastRead > 120) {
+        lastRead = now;
+        const p = host.sim.tcpPose();
+        setTcp(`X ${p.x.toFixed(1)}  Y ${p.y.toFixed(1)}  Z ${p.z.toFixed(1)}  ·  Rx ${p.rx.toFixed(0)}°  Ry ${p.ry.toFixed(0)}°  Rz ${p.rz.toFixed(0)}°`);
+      }
+      return host.sim;
+    });
+    sceneRef.current = s3;
+    if (import.meta.env.DEV || import.meta.env.VITE_E2E === 'true') {
+      // Test hook: drive a hand-guide drag through the same callbacks the gizmo uses.
+      (window as unknown as Record<string, unknown>).__tandemGuide = (dxMm: number, dyMm = 0, dzMm = 0) => {
+        const cb = (s3 as unknown as { cbForTests: import('./Scene3D').Scene3DCallbacks }).cbForTests;
+        cb.onGuideStart();
+        const steps = 10;
+        let ok = true;
+        for (let i = 1; i <= steps; i++) {
+          const T = host.sim.tcp().slice();
+          T[12] += dxMm / 1000 / steps; T[13] += dyMm / 1000 / steps; T[14] += dzMm / 1000 / steps;
+          ok = cb.onGuide(T) && ok;
+        }
+        cb.onGuideEnd();
+        return ok;
+      };
+    }
+    return () => { s3.dispose(); sceneRef.current = null; };
+  }, [set]);
+
+  useEffect(() => { sceneRef.current?.setGuide(handGuide, hgMode); }, [handGuide, hgMode]);
+  useEffect(() => { sceneRef.current?.setTargetsVisible(showFrames); }, [showFrames]);
+  useEffect(() => { if (fault) sceneRef.current?.flashFault(); }, [fault]);
+
+  const armName = host.sim ? ARMS[host.armId()]?.name : '';
+  void taskId; void armOverride;
+
+  return (
+    <div className="viewport" ref={ref}>
+      <div className="vp-overlay tl">
+        <span className="chip"><span className="dot" style={{ color: '#1a8cff' }} />{host.sim?.scene.title}</span>
+        <span className="chip">{armName}</span>
+      </div>
+      <div className="vp-overlay tr">
+        <div className="vp-glass">
+          <button className={`icon-btn ${showFrames ? 'on' : ''}`} title="Show target frames" aria-pressed={showFrames} onClick={() => set({ showFrames: !showFrames })}><Icon.eye /></button>
+          <button className="icon-btn" title="Reset camera" onClick={() => host.sim && sceneRef.current?.resetCamera(host.sim.scene)}><Icon.camera /></button>
+        </div>
+      </div>
+      {handGuide && (
+        <div className="vp-overlay" style={{ left: '50%', top: 12, transform: 'translateX(-50%)' }}>
+          <span className={`hg-banner ${blocked ? 'bad' : ''}`}>{blocked ? 'Can’t reach there — the arm holds its last valid pose' : 'Hand guiding · drag the handle at the tool'}</span>
+        </div>
+      )}
+      <div className="vp-overlay bl"><div className="vp-glass"><span className="vp-readout">TCP {tcp}</span></div></div>
+      {fault && !showSuccess && (
+        <div className="fault-card" role="alert">
+          <div className="row"><span className="code">PROTECTIVE STOP · {fault.code}</span><span className="grow" />
+            <button className="icon-btn" aria-label="Dismiss" onClick={() => set({ fault: null })}><Icon.x /></button></div>
+          <div className="title">{fault.message}</div>
+          <div className="muted">{FAULT_HELP[fault.code]}{fault.line && editor === 'code' ? ` · line ${fault.line}` : fault.blockId ? ' · the block is marked in your program' : ''}</div>
+          <div className="row" style={{ marginTop: 4 }}>
+            <button className="btn sm" onClick={() => { host.reset(); }}><Icon.reset /> Reset scene</button>
+            {onAskAgent && <button className="btn sm aqua" onClick={onAskAgent}><Icon.sparkle /> Ask AI partner about this</button>}
+          </div>
+        </div>
+      )}
+      {showSuccess && (
+        <div className="fault-card success-card" role="status">
+          <div className="row"><span className="code">TASK COMPLETE</span><span className="grow" />
+            <button className="icon-btn" aria-label="Dismiss" onClick={() => set({ showSuccess: false })}><Icon.x /></button></div>
+          <div className="title">Nicely done — every goal is met.</div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,12 @@
+await robot.home();
+await gripper.open();
+await io.waitFor('part_present', true, 60000);
+await robot.moveJ('pick.approach');
+await robot.moveL('pick');
+await gripper.close();
+await robot.moveL('pick.approach');
+await robot.moveJ('place.approach');
+await robot.moveL('place');
+await gripper.open();
+await robot.moveL('place.approach');
+await robot.home();

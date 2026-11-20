@@ -1,0 +1,36 @@
+rules_version = '2';
+// Tandem — clients may only append their own study logs and read/write their own checkpoint.
+// Everything else (codes, participants, usage, config, session docs) is server-only.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function ownsSession(sid) {
+      return signedIn() && get(/databases/$(database)/documents/sessions/$(sid)).data.uid == request.auth.uid;
+    }
+
+    match /sessions/{sid} {
+      allow read, write: if false;
+
+      match /batches/{batchId} {
+        allow create: if ownsSession(sid)
+          && request.resource.data.keys().hasOnly(['seqStart', 'seqEnd', 'events', 'clientTime', 'serverTime'])
+          && request.resource.data.events is list
+          && request.resource.data.events.size() <= 200
+          && request.resource.data.seqStart is int && request.resource.data.seqEnd is int;
+        allow read, update, delete: if false;
+      }
+
+      match /checkpoint/{docId} {
+        allow read: if docId == 'current' && ownsSession(sid);
+        allow create, update: if docId == 'current' && ownsSession(sid)
+          && request.resource.data.keys().hasOnly(['data', 'savedAt'])
+          && request.resource.data.data is string && request.resource.data.data.size() < 900000;
+        allow delete: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

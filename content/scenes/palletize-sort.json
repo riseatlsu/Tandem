@@ -1,0 +1,279 @@
+{
+  "id": "palletize-sort",
+  "title": "Sorting & Palletizing Line",
+  "environment": "warehouse",
+  "fixtures": [
+    {
+      "id": "table",
+      "kind": "box",
+      "center": [
+        250,
+        0,
+        -20
+      ],
+      "size": [
+        1500,
+        1400,
+        40
+      ],
+      "color": "#e9eef3",
+      "mount": true
+    },
+    {
+      "id": "conveyor",
+      "kind": "conveyor",
+      "center": [
+        180,
+        -420,
+        40
+      ],
+      "size": [
+        760,
+        170,
+        80
+      ],
+      "color": "#3d4652"
+    },
+    {
+      "id": "bin_red",
+      "kind": "bin",
+      "center": [
+        120,
+        420,
+        50
+      ],
+      "size": [
+        190,
+        190,
+        100
+      ],
+      "wall": 8,
+      "color": "#ef4444",
+      "label": "Red"
+    },
+    {
+      "id": "bin_green",
+      "kind": "bin",
+      "center": [
+        340,
+        420,
+        50
+      ],
+      "size": [
+        190,
+        190,
+        100
+      ],
+      "wall": 8,
+      "color": "#22c55e",
+      "label": "Green"
+    },
+    {
+      "id": "bin_blue",
+      "kind": "bin",
+      "center": [
+        560,
+        420,
+        50
+      ],
+      "size": [
+        190,
+        190,
+        100
+      ],
+      "wall": 8,
+      "color": "#3b82f6",
+      "label": "Blue"
+    },
+    {
+      "id": "pallet",
+      "kind": "box",
+      "center": [
+        560,
+        60,
+        10
+      ],
+      "size": [
+        260,
+        260,
+        20
+      ],
+      "color": "#c8a27a",
+      "label": "Pallet"
+    }
+  ],
+  "objects": [],
+  "regions": [
+    {
+      "id": "red",
+      "center": [
+        120,
+        420,
+        150
+      ],
+      "size": [
+        180,
+        180,
+        300
+      ],
+      "label": "Red bin"
+    },
+    {
+      "id": "green",
+      "center": [
+        340,
+        420,
+        150
+      ],
+      "size": [
+        180,
+        180,
+        300
+      ],
+      "label": "Green bin"
+    },
+    {
+      "id": "blue",
+      "center": [
+        560,
+        420,
+        150
+      ],
+      "size": [
+        180,
+        180,
+        300
+      ],
+      "label": "Blue bin"
+    },
+    {
+      "id": "pallet",
+      "center": [
+        560,
+        60,
+        120
+      ],
+      "size": [
+        250,
+        250,
+        200
+      ],
+      "label": "Pallet"
+    }
+  ],
+  "io": {
+    "inputs": [
+      {
+        "name": "part_present",
+        "initial": false
+      },
+      {
+        "name": "part_color",
+        "initial": "none"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "conveyor_run",
+        "initial": true
+      }
+    ]
+  },
+  "conveyors": [
+    {
+      "id": "infeed",
+      "start": [
+        -180,
+        -420,
+        80
+      ],
+      "end": [
+        450,
+        -420,
+        80
+      ],
+      "speed": 180,
+      "runOutput": "conveyor_run",
+      "sensorInput": "part_present",
+      "colorInput": "part_color",
+      "spawn": {
+        "intervalSec": 3,
+        "jitterSec": 0.5,
+        "count": 6,
+        "colors": [
+          "red",
+          "green",
+          "blue"
+        ],
+        "size": [
+          50,
+          50,
+          50
+        ],
+        "kind": "part"
+      }
+    }
+  ],
+  "sceneTargets": {
+    "pick.approach": {
+      "x": 450,
+      "y": -420,
+      "z": 230,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    },
+    "pick": {
+      "x": 450,
+      "y": -420,
+      "z": 105,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    },
+    "red.drop": {
+      "x": 120,
+      "y": 420,
+      "z": 200,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    },
+    "green.drop": {
+      "x": 340,
+      "y": 420,
+      "z": 200,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    },
+    "blue.drop": {
+      "x": 560,
+      "y": 420,
+      "z": 200,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    },
+    "pallet.corner": {
+      "x": 510,
+      "y": 10,
+      "z": 46,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    }
+  },
+  "camera": {
+    "position": [
+      1650,
+      -1450,
+      1150
+    ],
+    "target": [
+      280,
+      0,
+      260
+    ]
+  }
+}
