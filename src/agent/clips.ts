@@ -15,6 +15,9 @@ export const CLIPS: Clip[] = [
   { id: 'conveyor-wait', title: 'Waiting for the conveyor', about: 'Wait for input part_present before picking, so the robot only reaches once a part has arrived.' },
   { id: 'loop-repeat', title: 'Repeating with a loop', about: 'A Repeat / For-each block runs the same pick-and-place several times, shifting the drop point each time.' },
   { id: 'fault-recover', title: 'Faults and recovery', about: 'A target out of reach stops the program before the robot moves. The fault card names the block; fix it and press Reset.' },
+  { id: 'pendant-apps', title: 'Getting around the pendant', about: 'The Home screen has an app grid (Program, Jog, Positions, I/O, Log, Settings); tap a tile to open it, "Home" at the top left goes back, and the dock switches between the main apps.' },
+  { id: 'io-signals', title: 'The I/O app', about: 'Open I/O from Home and run a conveyor pick: the part_present input LED turns ON when a part reaches the sensor, the program switches the conveyor_run output OFF while it picks, then ON again. Signals are read-only on this screen; programs change outputs.' },
+  { id: 'positions-goto', title: 'Using the Positions app', about: 'The Positions app lists your taught positions and the cell\'s read-only ones; press Go to and the arm moves there, then teach a new position.' },
   { id: 'ai-suggestion', title: 'Accepting an AI suggestion', about: 'The AI partner tests a change in a hidden copy of the cell, then shows a card: Preview, Show me, Accept or Reject.' },
 ];
 

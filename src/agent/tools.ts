@@ -36,7 +36,7 @@ export function makeTools(b: AgentBridge, mode: 'qa' | 'suggest', features: Agen
     tool(async () => out(b.readProgram()), { name: 'read_program', description: 'The user’s current program (JavaScript in code mode; JSON steps + generated JavaScript in blocks mode).', schema: z.object({}) }),
     tool(async () => out(b.readSimState()), { name: 'read_sim_state', description: 'Live robot state: joints, tool pose, gripper, objects, signals, last fault.', schema: z.object({}) }),
     tool(async () => out(b.readLastRun() ?? 'No run yet.'), { name: 'read_last_run', description: 'Trace of the user’s most recent run: each command, its line/block, and the fault if any.', schema: z.object({}) }),
-    tool(async ({ query }) => out(b.searchDocs(query)), { name: 'search_docs', description: 'Search the robot API reference, block reference and cobot concepts.', schema: z.object({ query: z.string() }) }),
+    tool(async ({ query }) => out(b.searchDocs(query)), { name: 'search_docs', description: 'Search the robot API reference, block reference, cobot concepts, and the guide to the teach-pendant apps (Home, Program, Jog, Positions, I/O, Log, Settings, run keys).', schema: z.object({ query: z.string() }) }),
   ];
   if (mode === 'suggest') {
     tools.push(

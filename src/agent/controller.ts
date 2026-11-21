@@ -14,7 +14,7 @@ import { makeTools, type AgentBridge } from './tools';
 import { makeModel } from './llm';
 import { runAgentTurn } from './graph';
 import { runJsonProtocolTurn } from './jsonProtocol';
-import { PROMPT_VERSION, systemPrompt } from './prompts/system.v2';
+import { PROMPT_VERSION, systemPrompt } from './prompts/system.v3';
 import { getIdToken } from '../firebase';
 import { logEvent } from '../study/logger';
 import { CONFIG } from '../config';

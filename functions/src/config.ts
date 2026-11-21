@@ -9,7 +9,7 @@ export interface LlmConfig {
 }
 export const DEFAULT_CONFIG: LlmConfig = {
   enabled: true,
-  demoModels: ['gpt-5-mini', 'gpt-5-nano', 'gpt-4.1-mini'],
+  demoModels: ['gpt-5-nano', 'gpt-5-mini', 'gpt-4.1-mini'],
   limits: { demo: { requests: 40, tokens: 150_000 }, study: { requests: 600, tokens: 3_000_000 } },
   demoDailyTokenBudget: 3_000_000,
   maxOutputTokens: 4000,

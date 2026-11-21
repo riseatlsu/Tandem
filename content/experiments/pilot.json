@@ -2,9 +2,9 @@
   "id": "pilot",
   "version": "2",
   "conditions": {
-    "suggest": { "agent": { "mode": "suggest", "model": "gpt-5-mini", "promptVersion": "sys-v2", "features": { "visuals": false, "plans": false, "preview": false } }, "taskSequence": ["tut-jog-teach", "factory-pick-one", "kitchen-pour"] },
-    "qa": { "agent": { "mode": "qa", "model": "gpt-5-mini", "promptVersion": "sys-v2", "features": { "visuals": false, "plans": false, "preview": false } }, "taskSequence": ["tut-jog-teach", "factory-pick-one", "kitchen-pour"] },
-    "off": { "agent": { "mode": "off", "promptVersion": "sys-v2" }, "taskSequence": ["tut-jog-teach", "factory-pick-one", "kitchen-pour"] }
+    "suggest": { "agent": { "mode": "suggest", "model": "gpt-5-mini", "promptVersion": "sys-v3", "features": { "visuals": false, "plans": false, "preview": false } }, "taskSequence": ["tut-jog-teach", "factory-pick-one", "kitchen-pour"] },
+    "qa": { "agent": { "mode": "qa", "model": "gpt-5-mini", "promptVersion": "sys-v3", "features": { "visuals": false, "plans": false, "preview": false } }, "taskSequence": ["tut-jog-teach", "factory-pick-one", "kitchen-pour"] },
+    "off": { "agent": { "mode": "off", "promptVersion": "sys-v3" }, "taskSequence": ["tut-jog-teach", "factory-pick-one", "kitchen-pour"] }
   },
   "assignment": "byCode",
   "counterbalance": { "method": "latinSquare", "over": "taskSequence", "fixedPrefix": 1 },

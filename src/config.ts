@@ -11,5 +11,12 @@ export const CONFIG = {
   functionsUrl: (env.VITE_FUNCTIONS_URL as string | undefined)?.replace(/\/$/, '') ?? '',
   useEmulators: env.VITE_USE_EMULATORS === 'true',
   appVersion: (env.VITE_APP_VERSION as string) || 'dev',
-  demoModels: ((env.VITE_DEMO_MODELS as string) || 'gpt-5-mini,gpt-5-nano,gpt-4.1-mini').split(',').map((s) => s.trim()).filter(Boolean),
+  demoModels: ((env.VITE_DEMO_MODELS as string) || 'gpt-5-nano,gpt-5-mini,gpt-4.1-mini').split(',').map((s) => s.trim()).filter(Boolean),
 };
+
+/** Rough input price (USD per 1M tokens) used only to pick the demo's default model; unknown models rank last. */
+const MODEL_PRICE: Record<string, number> = {
+  'gpt-5-nano': 0.05, 'gpt-4.1-nano': 0.1, 'gpt-4o-mini': 0.15, 'gpt-5-mini': 0.25, 'gpt-4.1-mini': 0.4, 'gpt-5': 1.25, 'gpt-4.1': 2, 'gpt-4o': 2.5,
+};
+/** The demo starts on the cheapest allowed model; visitors can switch in the AI partner's model picker. */
+export const DEFAULT_DEMO_MODEL = [...CONFIG.demoModels].sort((a, b) => (MODEL_PRICE[a] ?? Infinity) - (MODEL_PRICE[b] ?? Infinity))[0] ?? 'gpt-5-nano';

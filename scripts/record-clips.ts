@@ -154,6 +154,44 @@ const CLIPS: Record<string, (p: Page) => Promise<void>> = {
       await sleep(900);
     });
   },
+  'pendant-apps': async (p) => {
+    await open(p, 'factory-pick-one', 'home');
+    await record(p, 'pendant-apps', async () => {
+      for (const tile of ['jog', 'positions', 'io', 'log']) {
+        await sleep(500);
+        await p.locator(`[data-tour="tile-${tile}"]`).click();
+        await sleep(1100);
+        if (tile === 'jog' || tile === 'positions') await p.locator('[data-tour="dock-home"]').click();
+        else await p.locator('.pd-back').click();
+      }
+      await sleep(400);
+      await p.locator('[data-tour="dock-program"]').click();
+      await sleep(900);
+    });
+  },
+  'io-signals': async (p) => {
+    await open(p, 'factory-pick-one', 'home');
+    await setSteps(p, [{ home: true }, { gripper: 'open' }, { waitInput: 'part_present', value: true }, { setOutput: 'conveyor_run', value: false }, { move: 'pick.approach' }, { move: 'pick', mode: 'linear' }, { gripper: 'close' }, { move: 'pick.approach', mode: 'linear' }, { setOutput: 'conveyor_run', value: true }, { move: 'bin.drop' }, { gripper: 'open' }, { home: true }]);
+    await sleep(600);
+    await record(p, 'io-signals', async () => {
+      await sleep(400);
+      await p.locator('[data-tour="tile-io"]').click();
+      await sleep(900);
+      await runAndWait(p, 1.5, 18_000);
+    }, 1000);
+  },
+  'positions-goto': async (p) => {
+    await open(p, 'factory-pick-one', 'positions');
+    await record(p, 'positions-goto', async () => {
+      for (const name of ['pick.approach', 'bin.drop']) {
+        await sleep(400);
+        await p.locator('.target-row', { has: p.locator('.name', { hasText: new RegExp(`^${name.replace('.', '\\.')}$`) }) }).getByRole('button', { name: /Go to/ }).click();
+        await sleep(2400); // the arm travels there
+      }
+      await p.getByRole('button', { name: /Teach new position here/ }).click();
+      await sleep(1300);
+    });
+  },
   'ai-suggestion': async (p) => {
     await fetch('http://localhost:8787/__reset', { method: 'POST' });
     await p.evaluate(() => localStorage.setItem('tandem.agentPos', JSON.stringify({ right: 24, bottom: 84 }))); // over the pendant, so the ghost is visible

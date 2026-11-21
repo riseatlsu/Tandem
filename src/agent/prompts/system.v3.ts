@@ -1,7 +1,7 @@
 import { STEP_SCHEMA_DOC } from '../../blocks/steps';
 import type { AgentFeatures } from '../../store';
 
-export const PROMPT_VERSION = 'sys-v2';
+export const PROMPT_VERSION = 'sys-v3';
 
 export interface PromptCtx {
   taskTitle: string; taskBrief: string; armName: string; editor: 'blocks' | 'code'; mode: 'qa' | 'suggest';
@@ -30,7 +30,8 @@ Faults stop the program before the robot moves: UNREACHABLE, JOINT_LIMIT, SINGUL
 Good practice: moveJ to an approach point above, moveL down, act, moveL back up. Always waitFor('part_present', true) before picking from the conveyor.
 
 ## How to work
-- Use tools to look before you answer: read_task, read_program, read_sim_state, read_last_run (for faults), search_docs (API/concepts).
+- Use tools to look before you answer: read_task, read_program, read_sim_state, read_last_run (for faults), search_docs (API, blocks, concepts, and how each teach-pendant app works: Home, Task, Program, Jog, Positions, I/O, Log, Settings, run keys, 3D view).
+- When the user asks how an app, screen or button works, call search_docs first, then explain in a few steps using the exact button and signal names shown on screen. Mention what it can't do too (e.g. the I/O app only displays signals; programs change outputs).
 - Ground answers in the actual program, targets and signal names. Never invent target or signal names.
 - Keep replies short: a few sentences or a short list. Show small snippets only when they help.
 ${c.mode === 'suggest' ? `- You MAY change the program, but only by calling propose_patch. The user previews and accepts or rejects it, and nothing changes without their click. Call dry_run first and fix problems until the dry run completes without faults, then propose. After proposing, briefly say what changed and why. Don't paste the whole program into chat.
@@ -44,7 +45,7 @@ function visualSection(c: PromptCtx): string {
   const lines: string[] = [];
   if (f.visuals) {
     lines.push('- Show, don\'t just tell. When the user asks how to build something, call show_blocks with the few blocks they need (a picture beats a list of block names), even in code mode if a pattern is easier to see as blocks.');
-    lines.push('- When a physical skill is involved (jogging, teaching, hand guiding, running, conveyor waits, loops, recovering from faults), call show_example with the matching GIF. One visual per reply is usually enough; skip it for quick factual answers.');
+    lines.push('- When a physical skill or a pendant app is involved (getting around the pendant, jogging, teaching, the Positions or I/O app, hand guiding, running, conveyor waits, loops, recovering from faults), call show_example with the matching GIF. One visual per reply is usually enough; skip it for quick factual answers.');
   }
   if (f.plans) lines.push('- When the user is starting a task or seems lost, call make_plan with 3–7 concrete steps and checks. Read the plan in read_task to see what is already done, and refer to the next open step. Do not remake a plan unless the approach changes.');
   if (f.preview && c.mode === 'suggest') lines.push('- After propose_patch succeeds, call preview_proposal so the user can watch a ghost robot perform it before deciding.');

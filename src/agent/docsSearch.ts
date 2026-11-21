@@ -2,7 +2,7 @@ import index from './docs-index.json';
 
 interface Chunk { id: string; doc: string; title: string; text: string }
 const chunks = index as Chunk[];
-const tok = (s: string) => s.toLowerCase().match(/[a-z0-9_.]+/g) ?? [];
+const tok = (s: string) => s.toLowerCase().replace(/\bi\s*\/\s*o\b/g, 'io').match(/[a-z0-9_.]+/g) ?? [];
 const docs = chunks.map((c) => tok(`${c.title} ${c.title} ${c.text}`));
 const avgdl = docs.reduce((a, d) => a + d.length, 0) / docs.length;
 const df = new Map<string, number>();

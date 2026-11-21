@@ -54,7 +54,7 @@ These decisions were made while building v1. They take precedence over the secti
   - feature showcase with recorded clips, a level gallery that opens `?demo=<taskId>`, and a rotating robot lineup;
   - a music toggle that is **off by default**.
   `?demo[=taskId]` opens the app and `&tour` starts the tour. `?code=` / `?study` go straight to the study gate and never show the landing page. There is no code box on the landing page; participants use their link. The demo top-bar logo links back home.
-- **AI-partner features are per-condition flags** (`conditions.<c>.agent.features: { visuals, plans, preview }`, anything omitted is off; all on in the demo). They are recorded in `StudyInfo.features` and gate both the tools and the prompt section (`sys-v2`).
+- **AI-partner features are per-condition flags** (`conditions.<c>.agent.features: { visuals, plans, preview }`, anything omitted is off; all on in the demo). They are recorded in `StudyInfo.features` and gate both the tools and the prompt section (`sys-v3`).
   - `visuals`: `show_blocks` draws a read-only Blockly picture of JSON steps in the chat (untaught targets allowed). `show_example` plays a curated GIF from `src/agent/clips.ts`.
   - `plans`: `make_plan` pins a 3–7 step checklist. Steps carry optional checks (`target`, `uses`, `screen`, `holding`, `run`, `goal`) that tick themselves from live state every 300 ms; the user ticks the others. Ticks are sticky and plans are checkpointed.
   - `preview` (suggest only): `preview_proposal` and a "Show me" button on proposal cards. They dry-run the proposal from the robot's current pose with motion recording (`recordEvery`) and replay it on a translucent ghost arm in the cell view; the real robot never moves.

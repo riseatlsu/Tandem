@@ -65,12 +65,9 @@ export function Topbar() {
       </div>
       <div className="row">
         <SoundToggles />
-        {mode === 'study' ? <span className="chip aqua"><span className="dot" />Study · {study?.code}</span> : (
-          <>
-            <span className="chip leaf"><span className="dot" />Demo</span>
-            <button className="btn sm ghost" onClick={() => { const u = new URL(location.href); u.searchParams.set('study', '1'); location.assign(u.toString()); }}>Join a study</button>
-          </>
-        )}
+        {mode === 'study'
+          ? <span className="chip aqua"><span className="dot" />Study · {study?.code}</span>
+          : <span className="chip leaf"><span className="dot" />Demo</span>}
       </div>
       {confirmSkip && createPortal(
         <div className="modal-back" onClick={() => setConfirmSkip(false)}>

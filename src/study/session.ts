@@ -5,7 +5,7 @@ import { host } from '../simHost';
 import { flush, logEvent, startLogging, type LogSink } from './logger';
 import { callFunction, firebaseEnabled, getDb, initFirebase } from '../firebase';
 import { CONFIG } from '../config';
-import { PROMPT_VERSION } from '../agent/prompts/system.v2';
+import { PROMPT_VERSION } from '../agent/prompts/system.v3';
 import type { LogEvent } from './events';
 
 export interface RedeemResult { sessionId: string; experimentId: string; condition: string; orderIndex: number; checkpoint?: string | null; rebound?: boolean }

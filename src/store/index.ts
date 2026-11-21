@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { DEFAULT_DEMO_MODEL } from '../config';
 import type { Fault, PredicateResult, Target } from '../sim/types';
 import type { RunTrace } from '../runtime/protocol';
 import type { RunState } from '../runtime/ProgramRunner';
@@ -93,7 +94,7 @@ export const useApp = create<AppState>((set) => ({
   workspaces: {}, runState: 'idle', speed: 1, highlight: {}, console: [], lastTrace: null, fault: null,
   predicates: [], passed: {}, showSuccess: false,
   jog: { mode: 'axes13', frame: 'base', step: 1 }, pendantScreen: 'home', agentOpen: false, handGuide: false, handGuideMode: 'translate', handGuideBlocked: false, showFrames: true,
-  chats: {}, plans: {}, tour: null, tourDone: false, agentBusy: false, demoModel: 'gpt-5-mini', toasts: [], taskStartedAt: Date.now(), timeLeftSec: null,
+  chats: {}, plans: {}, tour: null, tourDone: false, agentBusy: false, demoModel: DEFAULT_DEMO_MODEL, toasts: [], taskStartedAt: Date.now(), timeLeftSec: null,
   set: (p) => set(typeof p === 'function' ? p : () => p),
 }));
 
