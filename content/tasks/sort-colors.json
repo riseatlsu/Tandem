@@ -3,5 +3,7 @@
   "editor": "blocks", "passOn": "run",
   "brief": "Six parts arrive in a random color order. Read the color sensor `part_color` when a part is waiting and drop it in the bin with the matching color.",
   "predicates": [{ "type": "sortedByColor", "kind": "part", "map": { "red": "red", "green": "green", "blue": "blue" }, "minCount": 6, "label": "All 6 parts in the right bins" }, { "type": "programCompleted" }, { "type": "noFaults" }],
-  "timeLimitSec": 1200
+  "timeLimitSec": 1200,
+  "demo": { "order": 50 },
+  "difficulty": 2
 }

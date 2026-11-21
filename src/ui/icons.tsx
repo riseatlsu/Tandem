@@ -47,6 +47,7 @@ export const Icon = {
   minus: P('M5 12h14', { strokeWidth: 2.6 }),
   speaker: P(['M4 9h4l5-4v14l-5-4H4z', 'M16.5 8.5a5 5 0 0 1 0 7', 'M19 6a8.5 8.5 0 0 1 0 12']),
   speakerOff: P(['M4 9h4l5-4v14l-5-4H4z', 'M17 9l5 6', 'M22 9l-5 6']),
+  copy: P(['M9 9h11v11H9z', 'M5 15H4V4h11v1']),
   music: P(['M9 18V5l11-2v13', 'M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0z', 'M20 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z']),
   joystick: P(['M12 12V7', 'M12 7a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M5 16l7-4 7 4-7 4z', 'M5 16v2l7 4 7-4v-2']),
 };

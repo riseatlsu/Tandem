@@ -6,7 +6,7 @@
  *   VITE_BASE=/ VITE_E2E=true VITE_FIREBASE_API_KEY= VITE_LLM_PROXY_URL=http://localhost:8787 npx vite --port 5180   # terminal 2
  *   npx tsx scripts/record-clips.ts [--url http://localhost:5180] [--only jog-joystick,run-program] [--no-thumbs]
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { chromium, type Page } from '@playwright/test';
 import { decodePng, downscale, encodeGif, type RGBA } from './lib/gif';
 
@@ -175,7 +175,9 @@ const CLIPS: Record<string, (p: Page) => Promise<void>> = {
 
 async function thumbs(page: Page) {
   mkdirSync('public/landing/levels', { recursive: true });
-  for (const id of ['tut-jog-teach', 'tut-first-program', 'factory-pick-one', 'factory-bin-three', 'sort-colors', 'palletize-2x2x2', 'kitchen-pour', 'lab-tubes']) {
+  // every task listed in the demo gets a landing-page thumbnail
+  const demo = readdirSync('content/tasks').map((f) => JSON.parse(readFileSync(`content/tasks/${f}`, 'utf8')) as { id: string; demo?: unknown }).filter((t) => t.demo).map((t) => t.id);
+  for (const id of demo) {
     await open(page, id);
     await T(page, `T.useApp.getState().set({ showFrames: false }); return null;`);
     await page.addStyleTag({ content: '.vp-overlay{display:none!important}' });

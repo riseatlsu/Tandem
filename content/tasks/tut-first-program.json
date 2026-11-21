@@ -4,5 +4,7 @@
   "brief": "Build a program that goes **home**, moves above the fixture plate (`place.approach`), then above the bin (`bin.drop`), and returns home.\n\nPress **Run** when you are ready.",
   "predicates": [{ "type": "programCompleted" }, { "type": "noFaults" }],
   "conveyorOverrides": { "infeed": { "count": 0 } },
-  "starter": { "blocks": [{ "type": "robot_home" }] }
+  "starter": { "blocks": [{ "type": "robot_home" }] },
+  "demo": { "order": 20 },
+  "difficulty": 1
 }

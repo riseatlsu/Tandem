@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
-import { TASKS, TASK_ORDER } from '../../src/content';
+import { TASKS, DEMO_TASKS } from '../../src/content';
 import { simFor } from './helpers';
 import { runHeadless } from '../../src/runtime/headless';
 import { evaluateAll } from '../../src/sim/predicates/evaluators';
@@ -8,7 +8,11 @@ import { evaluateAll } from '../../src/sim/predicates/evaluators';
 const solution = (id: string) => readFileSync(`tests/fixtures/solutions/${id}.js`, 'utf8');
 
 describe('every task has a passing reference solution', () => {
-  for (const id of TASK_ORDER.filter((i) => existsSync(`tests/fixtures/solutions/${i}.js`))) {
+  it('every task has a solution unless it is passed live', () => {
+    for (const t of Object.values(TASKS)) if (t.passOn !== 'live') expect(existsSync(`tests/fixtures/solutions/${t.id}.js`), t.id).toBe(true);
+    expect(DEMO_TASKS[0]).toBe('tut-jog-teach');
+  });
+  for (const id of Object.keys(TASKS).filter((i) => existsSync(`tests/fixtures/solutions/${i}.js`))) {
     it(id, async () => {
       const t = TASKS[id];
       const sim = simFor(id);

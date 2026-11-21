@@ -1,0 +1,25 @@
+{
+  "id": "example-custom-models",
+  "title": "Move the widget to the tray",
+  "brief": "A **custom-model** cell: pick the orange widget and put it on the tray.\n\n- Positions: `widget.approach`, `widget`, `tray.approach`, `tray.place`",
+  "sceneId": "example-custom-cell",
+  "armId": "tandem-mini-6",
+  "seed": 1,
+  "editor": "blocks",
+  "passOn": "run",
+  "predicates": [
+    {
+      "type": "objectInRegion",
+      "object": "widget",
+      "region": "tray"
+    },
+    {
+      "type": "upright",
+      "object": "widget"
+    },
+    {
+      "type": "programCompleted"
+    }
+  ],
+  "hints": ["Approach from above with a joint move, then go straight down.", "Use straight-line moves near the CNC machine so the arm does not swing into it."]
+}

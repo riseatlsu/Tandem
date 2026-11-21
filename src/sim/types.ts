@@ -3,6 +3,23 @@ import type { M4, V3 } from './math/mat4';
 /** User-facing pose: mm and degrees, R = Rx(rx)·Ry(ry)·Rz(rz), in the robot base (= world) frame. */
 export interface Pose { x: number; y: number; z: number; rx: number; ry: number; rz: number }
 
+// ---------------- 3D models ----------------
+/**
+ * A model file under public/models (.glb/.gltf/.obj/.stl/.dae). Purely visual: collision and grasping
+ * always use the owner's box/cylinder/capsule shapes, so the simulation stays deterministic.
+ */
+export interface MeshRef {
+  file: string; // path relative to public/, e.g. "models/my-lab/cnc.glb"
+  units?: 'm' | 'cm' | 'mm' | 'in'; // units the file was modelled in (default m for glb/gltf/dae, mm for obj/stl)
+  scale?: number; // extra uniform scale
+  upAxis?: 'z' | 'y'; // glTF and most DCC tools are Y-up (default y for glb/gltf, z otherwise)
+  offset?: [number, number, number]; // mm, applied after centering
+  rotation?: [number, number, number]; // deg, XYZ
+  color?: string; // override material color (files without materials get a glossy default)
+}
+/** Arm part: a mesh attached to one link. `frame: 'zero'` = modelled in place with the arm at all-zero joints. */
+export type ArmMeshPart = MeshRef & { link: number | string; frame?: 'link' | 'zero' };
+
 // ---------------- Arms ----------------
 export interface ArmLink {
   name: string;
@@ -15,7 +32,7 @@ export interface DHRow { theta: number; d: number; a: number; alpha: number; typ
 export interface ArmJson {
   id: string;
   name: string;
-  kind: 'articulated6' | 'scara4';
+  kind: 'articulated6' | 'scara4' | 'other';
   /** Either DH rows (standard DH; converted to links) or an explicit link chain. */
   dh?: DHRow[];
   links?: ArmLink[];
@@ -27,7 +44,9 @@ export interface ArmJson {
   linkRadius: number[]; // collision capsule radius (mm) for segment between consecutive link origins
   visual:
     | { source: 'uaibot'; model: 'kuka_kr5' | 'epson_t6' }
-    | { source: 'procedural'; color: string; accent: string };
+    | { source: 'procedural'; color: string; accent: string }
+    /** Your own models: one file per link (`parts`), and/or one file whose named nodes map to links (`model.nodes`). */
+    | { source: 'mesh'; parts?: ArmMeshPart[]; model?: MeshRef & { nodes: Record<string, number | string>; frame?: 'link' | 'zero' } };
   gripper: { stroke: number; graspTolerance: number; alignTolDeg: number };
   /** For SCARA: IK only constrains x,y,z,rz. */
   ikRows?: number[];
@@ -44,7 +63,7 @@ export interface ArmDef extends Omit<ArmJson, 'dh' | 'links'> {
 // ---------------- Scenes ----------------
 export interface FixtureDef {
   id: string;
-  kind: 'box' | 'bin' | 'conveyor' | 'rack' | 'region';
+  kind: 'box' | 'bin' | 'conveyor' | 'rack' | 'region' | 'model';
   /** center (mm), yaw (deg); size = full extents (mm). bin: open-top container with wall thickness. */
   center: [number, number, number];
   size: [number, number, number];
@@ -56,6 +75,8 @@ export interface FixtureDef {
   mount?: boolean;
   /** decorative only: no collision */
   visualOnly?: boolean;
+  /** kind 'model': a 3D model drawn centered in the fixture's box (the box is what the robot collides with) */
+  mesh?: MeshRef;
 }
 export interface ObjectDef {
   id: string;
@@ -67,6 +88,8 @@ export interface ObjectDef {
   color?: string;
   graspable?: boolean;
   container?: { capacity: number; fill: number };
+  /** drawn instead of the box/cylinder; its bottom sits on the object's position */
+  mesh?: MeshRef;
 }
 export interface RegionDef { id: string; center: [number, number, number]; size: [number, number, number]; label?: string }
 export interface ConveyorDef {
@@ -77,12 +100,12 @@ export interface ConveyorDef {
   runOutput: string; // output name that runs the belt
   sensorInput: string; // input set true when a part waits at the end
   colorInput?: string; // optional input reporting the color at the sensor
-  spawn: { intervalSec: number; jitterSec: number; count: number; colors: string[]; size: [number, number, number]; kind: string; shape?: 'box' | 'cylinder'; prefill?: boolean };
+  spawn: { intervalSec: number; jitterSec: number; count: number; colors: string[]; size: [number, number, number]; kind: string; shape?: 'box' | 'cylinder'; prefill?: boolean; mesh?: MeshRef };
 }
 export interface SceneDef {
   id: string;
   title: string;
-  environment: 'factory' | 'warehouse' | 'kitchen';
+  environment: 'factory' | 'warehouse' | 'kitchen' | 'lab' | 'custom';
   fixtures: FixtureDef[];
   objects: ObjectDef[];
   regions: RegionDef[];

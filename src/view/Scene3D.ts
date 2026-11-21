@@ -4,10 +4,12 @@ import { TransformControls } from 'three/examples/jsm/controls/TransformControls
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { SimCore } from '../sim/SimCore';
-import type { FixtureDef, ObjState, SceneDef, Target } from '../sim/types';
+import type { FixtureDef, MeshRef, ObjState, SceneDef, Target } from '../sim/types';
 import { poseToM4 } from '../sim/kinematics/arm';
 import { apply, col, pos, type M4 } from '../sim/math/mat4';
-import { RobotVisual, glossy } from './robotVisual';
+import { RobotVisual } from './robotVisual';
+import { glossy } from './materials';
+import { attachModel, placeholder } from './meshes';
 import { ghostEnded, onGhost, sampleGhost, type GhostClip } from './ghost';
 
 export const COLOR_NAMES: Record<string, string> = {
@@ -206,6 +208,52 @@ export class Scene3D {
     this.camera.updateProjectionMatrix();
   }
 
+  // ---------------- Studio (content editor) support
+  private editTc: TransformControls | null = null;
+  private editProxy = new THREE.Object3D();
+  private editMove: ((posMm: [number, number, number]) => void) | null = null;
+  private selBox: THREE.BoxHelper | null = null;
+  /** Rebuild the static scene on the next frame (the studio edits the scene in place). */
+  invalidate() { this.sceneId = ''; this.targetsKey = ''; this.robotArmId = ''; }
+  /** The fixture/object under a pointer position, as "fixture:<id>" / "object:<id>". */
+  pick(clientX: number, clientY: number): string | null {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1), this.camera);
+    for (const hit of ray.intersectObjects(this.world.children, true)) {
+      for (let o: THREE.Object3D | null = hit.object; o; o = o.parent) if (o.userData.editId) return o.userData.editId as string;
+    }
+    return null;
+  }
+  /** Shows a move gizmo at `posMm` (null hides it) and outlines the selected item. */
+  setEditTarget(editId: string | null, posMm: [number, number, number] | null, onMove?: (posMm: [number, number, number]) => void) {
+    if (!this.editTc) {
+      this.editTc = new TransformControls(this.camera, this.renderer.domElement);
+      this.editTc.setSize(0.8);
+      this.scene.add(this.editProxy);
+      this.editTc.attach(this.editProxy);
+      this.scene.add(this.editTc.getHelper());
+      this.editTc.addEventListener('dragging-changed', (e) => { this.controls.enabled = !(e as unknown as { value: boolean }).value; });
+      this.editTc.addEventListener('objectChange', () => { const p = this.editProxy.position; this.editMove?.([Math.round(p.x * 1000), Math.round(p.y * 1000), Math.round(p.z * 1000)]); });
+    }
+    this.editMove = onMove ?? null;
+    const on = !!posMm;
+    this.editTc.enabled = on;
+    this.editTc.getHelper().visible = on;
+    if (posMm) this.editProxy.position.set(posMm[0] / 1000, posMm[1] / 1000, posMm[2] / 1000);
+    this.selectedId = editId;
+  }
+  private selectedId: string | null = null;
+  get editDragging() { return !!this.editTc && (this.editTc as unknown as { dragging: boolean }).dragging; }
+  private syncSelection() {
+    let target: THREE.Object3D | null = null;
+    if (this.selectedId) this.world.traverse((o) => { if (!target && o.userData.editId === this.selectedId) target = o; });
+    if (!target) { if (this.selBox) this.selBox.visible = false; return; }
+    if (!this.selBox) { this.selBox = new THREE.BoxHelper(target, '#ff9a1f'); this.scene.add(this.selBox); }
+    this.selBox.setFromObject(target);
+    this.selBox.visible = true;
+  }
+
   /** Pause rendering (e.g. when scrolled out of view on the landing page). */
   paused = false;
   /** Landing-page mode: no zoom/pan (the page scrolls), slow auto-orbit, no TCP marker or target frames. */
@@ -274,7 +322,12 @@ export class Scene3D {
     g.position.set(cx, cy, cz);
     g.rotation.z = ((f.yaw ?? 0) * Math.PI) / 180;
     const color = f.color ?? '#dfe7ef';
-    if (f.kind === 'bin' || f.kind === 'rack') {
+    g.userData.editId = `fixture:${f.id}`;
+    if (f.mesh && f.kind !== 'conveyor') {
+      attachModel(g, f.mesh, 'center', [sx, sy, sz]);
+    } else if (f.kind === 'model') {
+      g.add(placeholder([sx, sy, sz], true));
+    } else if (f.kind === 'bin' || f.kind === 'rack') {
       const w = mm(f.wall ?? 8);
       const mat = glossy(color, { roughness: 0.28, transmission: f.kind === 'bin' ? 0.12 : 0, thickness: 0.01 });
       const parts: [number, number, number, number, number, number][] = [
@@ -327,12 +380,18 @@ export class Scene3D {
     return g;
   }
 
-  private objectMesh(o: ObjState): THREE.Group {
+  private objectMesh(o: ObjState, scene: SceneDef): THREE.Group {
     const g = new THREE.Group();
     g.matrixAutoUpdate = false;
+    g.userData.editId = `object:${o.id}`;
     const [sx, sy, sz] = o.size;
     const color = colorHex(o.color);
-    if (o.container) {
+    // your own model: from the object definition, or from the conveyor that spawned it
+    const mesh: MeshRef | undefined = scene.objects.find((d) => d.id === o.id)?.mesh
+      ?? scene.conveyors.find((c) => c.spawn.mesh && o.id.startsWith(c.spawn.kind) && /^\d+$/.test(o.id.slice(c.spawn.kind.length)))?.spawn.mesh;
+    if (mesh && !o.container) {
+      attachModel(g, { color: mesh.color ?? (mesh.file.match(/\.(obj|stl)$/i) ? color : undefined), ...mesh }, 'bottom', [sx, sy, sz]);
+    } else if (o.container) {
       // translucent glass vessel + liquid
       const r = sx / 2;
       const glass = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.92, sz, 40, 1, true), new THREE.MeshPhysicalMaterial({ color, transmission: 0.75, roughness: 0.06, thickness: 0.004, transparent: true, opacity: 0.55, side: THREE.DoubleSide, clearcoat: 1 }));
@@ -413,13 +472,14 @@ export class Scene3D {
     const held = s.holding ? s.objects.find((o) => o.id === s.holding!.id) : null;
     const f = this.robot.update(s.q, s.gripperOpen, held ? Math.min(held.size[0], held.size[1]) : null, dt);
     this.syncGhost(sim, dt);
+    if (this.selectedId !== null || this.selBox?.visible) this.syncSelection();
 
     // objects
     const seen = new Set<string>();
     for (const o of s.objects) {
       seen.add(o.id);
       let m = this.objMeshes.get(o.id);
-      if (!m) { m = this.objectMesh(o); this.objMeshes.set(o.id, m); this.world.add(m); }
+      if (!m) { m = this.objectMesh(o, sim.scene); this.objMeshes.set(o.id, m); this.world.add(m); }
       m.matrix.fromArray(o.pose);
       m.matrixWorldNeedsUpdate = true;
       if (o.container) {
@@ -501,6 +561,7 @@ export class Scene3D {
     cancelAnimationFrame(this.raf);
     this.offGhost();
     this.ghost?.dispose();
+    this.editTc?.dispose();
     this.ro.disconnect();
     this.tc.dispose();
     this.controls.dispose();

@@ -1,0 +1,168 @@
+{
+  "id": "tandem-mini-6",
+  "name": "Tandem Mini 6 (URDF example)",
+  "kind": "articulated6",
+  "links": [
+    {
+      "name": "base_link",
+      "pre": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      "joint": null,
+      "post": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+    },
+    {
+      "name": "link1",
+      "pre": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0.16, 1],
+      "joint": {
+        "index": 0,
+        "type": "R"
+      },
+      "post": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+    },
+    {
+      "name": "link2",
+      "pre": [1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0.08, 1],
+      "joint": {
+        "index": 1,
+        "type": "R"
+      },
+      "post": [1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1]
+    },
+    {
+      "name": "link3",
+      "pre": [1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0.35, 1],
+      "joint": {
+        "index": 2,
+        "type": "R"
+      },
+      "post": [1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1]
+    },
+    {
+      "name": "link4",
+      "pre": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0.3, 1],
+      "joint": {
+        "index": 3,
+        "type": "R"
+      },
+      "post": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+    },
+    {
+      "name": "link5",
+      "pre": [1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0.08, 1],
+      "joint": {
+        "index": 4,
+        "type": "R"
+      },
+      "post": [1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1]
+    },
+    {
+      "name": "link6",
+      "pre": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0.08, 1],
+      "joint": {
+        "index": 5,
+        "type": "R"
+      },
+      "post": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+    },
+    {
+      "name": "tool0",
+      "pre": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0.03, 1],
+      "joint": null,
+      "post": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+    }
+  ],
+  "jointLimitsDeg": [
+    {
+      "min": -360.0,
+      "max": 360.0,
+      "maxVel": 92
+    },
+    {
+      "min": -143.24,
+      "max": 143.24,
+      "maxVel": 92
+    },
+    {
+      "min": -160.43,
+      "max": 160.43,
+      "maxVel": 92
+    },
+    {
+      "min": -360.0,
+      "max": 360.0,
+      "maxVel": 92
+    },
+    {
+      "min": -174.75,
+      "max": 174.75,
+      "maxVel": 92
+    },
+    {
+      "min": -360.0,
+      "max": 360.0,
+      "maxVel": 92
+    }
+  ],
+  "tool": {
+    "x": 0,
+    "y": 0,
+    "z": 120,
+    "rx": 0,
+    "ry": 0,
+    "rz": 0
+  },
+  "homeDeg": [0, 30, 60, 0, 90.2, 0],
+  "maxTcpSpeed": 1000,
+  "linkRadius": [45, 45, 45, 45, 45, 45, 45, 45],
+  "visual": {
+    "source": "mesh",
+    "parts": [
+      {
+        "link": "base_link",
+        "file": "models/examples/mini-arm/meshes/base_link.stl",
+        "units": "m",
+        "upAxis": "z"
+      },
+      {
+        "link": "link1",
+        "file": "models/examples/mini-arm/meshes/link1.stl",
+        "units": "m",
+        "upAxis": "z"
+      },
+      {
+        "link": "link2",
+        "file": "models/examples/mini-arm/meshes/link2.stl",
+        "units": "m",
+        "upAxis": "z"
+      },
+      {
+        "link": "link3",
+        "file": "models/examples/mini-arm/meshes/link3.stl",
+        "units": "m",
+        "upAxis": "z"
+      },
+      {
+        "link": "link4",
+        "file": "models/examples/mini-arm/meshes/link4.stl",
+        "units": "m",
+        "upAxis": "z"
+      },
+      {
+        "link": "link5",
+        "file": "models/examples/mini-arm/meshes/link5.stl",
+        "units": "m",
+        "upAxis": "z"
+      },
+      {
+        "link": "link6",
+        "file": "models/examples/mini-arm/meshes/link6.stl",
+        "units": "m",
+        "upAxis": "z"
+      }
+    ]
+  },
+  "gripper": {
+    "stroke": 60,
+    "graspTolerance": 15,
+    "alignTolDeg": 20
+  }
+}

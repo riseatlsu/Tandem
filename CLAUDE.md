@@ -17,6 +17,9 @@ npm run test:functions               # functions + Firestore rules in Firebase e
 npm run lint && npm run typecheck
 npm run build                        # docs index → tsc → vite build (VITE_BASE defaults to /FactorySim/)
 npm run docs:index                   # content/docs/*.md → src/agent/docs-index.json (re-run after editing docs)
+VITE_BASE=/ npm run dev  →  /?editor # Tandem Studio: build environments, tasks, experiments, arms (dev server only; saves into content/)
+npx tsx scripts/gen-codes.ts --experiment pilot --per-condition 10 --dry-run   # participant codes + links (Studio > Experiments does it with buttons)
+npx tsx scripts/make-example-models.ts  # regenerate public/models/examples (format references)
 npx tsx scripts/record-clips.ts      # re-record public/clips/*.gif + landing thumbnails (needs mock-llm + a VITE_E2E dev server on :5180; see file header)
 ```
 
@@ -34,7 +37,9 @@ npx tsx scripts/record-clips.ts      # re-record public/clips/*.gif + landing th
   - Fault lines come from `user-program.js` sourceURL stack frames. Block highlighting uses Blockly `STATEMENT_PREFIX` → `__hl(id)`.
 - **One API, three descriptions.** If you change the robot API, update `runtime/robotApi.ts`, `editor/robotApiDts.ts` (Monaco typings), `content/docs/*.md` (then `npm run docs:index`), the block generator in `blocks/definitions.ts`, `blocks/steps.ts` (`stepsToJs`), and the system prompt (`agent/prompts/system.vN.ts`, bumping `PROMPT_VERSION`).
 - **Blocks** compile one way to JS. The agent reads and proposes block programs as compact JSON "steps" (`blocks/steps.ts`), which are validated against known targets and signals before anything is shown to the user.
-- **Content is data.** Arms, scenes, tasks and experiments live in `content/**/*.json`, validated by zod in `src/content/index.ts`. Every task has a reference solution in `tests/fixtures/solutions/<task>.js` that must pass. Add one when you add a task, because it is how scene geometry gets validated.
+- **Content is data.** Arms, scenes, tasks and experiments live in `content/**/*.json`, validated by zod in `src/content/index.ts`. Every task has a reference solution in `tests/fixtures/solutions/<task>.js` that must pass (only `passOn: "live"` tasks may skip it). Add one when you add a task, because it is how scene geometry gets validated. Tandem Studio (`src/studio/`, `?editor`) authors all of this and enforces the same rules. The demo level list is `DEMO_TASKS`, the tasks with `demo.order`; never hard-code task lists.
+- **3D models are visual only.** `MeshRef` on fixtures, objects, conveyor spawns and arm `visual.source: "mesh"` are drawn by `src/view/meshes.ts`. Physics keeps using boxes, cylinders and capsules, so never make collision or predicates depend on mesh geometry. URDF conversion is in `src/content/urdf.ts`.
+- **No emojis in UI text** (blocks use SVG icons from `ICONS` in `blocks/definitions.ts`). Only the AI partner's replies may use them.
 - **UI.** Two views: `view/Viewport.tsx` (3D cell + cell-level controls) and `pendant/Pendant.tsx` (teach pendant). The pendant shows one screen at a time (`useApp.pendantScreen`, navigate with `go()` from `pendant/screens.tsx`), with hardware run keys underneath. The Program screen is never unmounted, so Blockly state and the generated JS survive navigation. The AI partner (`panels/ChatPanel.tsx`) is a status-bar button (`AgentButton`) plus a draggable floating window (`AgentDock`). Its modals are portaled to `document.body`, because `backdrop-filter` ancestors trap `position: fixed`. E2E helpers `pendant(page, 'Jog')` and `openAgent(page)` navigate the UI. Demo task jumps go through the top-bar bubbles (`getByRole('button', { name: /^Task 2:/ })`).
 - **Audio** (`src/audio/`) is all WebAudio synthesis: `sound.ts` (effects, wired by `initSound()` through a global pointer listener and a store subscription; `soundFrame()` is called from the render loop for the motor hum) and `music.ts` (demo-only generative music, or `public/music/theme.mp3` if present). Headless Chromium's realtime audio clock is unreliable, so verify synthesis with an `OfflineAudioContext` render instead.
 - **Landing / routing**: `main.tsx` picks the landing page (`src/landing/`, lazy, must not import Blockly/Monaco/LangChain) or the app (`?demo`, `?code`, `?study`). The hero replays reference solutions through `runHeadless({ onStep })`.
@@ -48,6 +53,7 @@ npx tsx scripts/record-clips.ts      # re-record public/clips/*.gif + landing th
   - All key handling, the model lock for study participants, quotas (per uid, per IP hash, global demo budget) and the kill switch are server-side.
   - The function never logs prompt content.
   - Firestore rules (`firestore.rules`) let clients only create log batches and read/write their own checkpoint.
+- **Participant codes** (`scripts/lib/codes.ts`, shared by `scripts/gen-codes.ts` and Studio's `/__studio/codes/*`): the service-account key lives in gitignored `keys/` (also in Vite `server.fs.deny`) and is only read server-side; never send it to the browser or log it. Re-generating continues each condition's `orderIndex`.
 - **Study logging.** `study/logger.ts` sends events to an IndexedDB queue, then flushes them as batched Firestore docs (`sessions/{sid}/batches`) with a monotonic `seq`. New event types go in `study/events.ts`. The logger scrubs JWT- and API-key-shaped strings, so never log tokens or IPs. Demo mode logs nothing.
 
 ## Testing notes

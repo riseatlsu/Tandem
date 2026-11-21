@@ -3,5 +3,7 @@
   "editor": "code", "passOn": "run",
   "brief": "Pick up the pitcher and pour until the cup is at least **80% full**, then put the pitcher back down **upright**.\n\nTilting the tool past 90° pours. With the gripper pointing down (`rx: 180`), setting `rx: -70` tilts the pitcher toward −y, so its spout moves about 56 mm toward −y. `cup.above` is already offset for you.",
   "predicates": [{ "type": "fillAtLeast", "object": "cup1", "frac": 0.8 }, { "type": "spilledAtMost", "frac": 0.25 }, { "type": "upright", "object": "pitcher" }, { "type": "programCompleted" }, { "type": "noFaults" }],
-  "starter": { "code": "await robot.home();\nawait gripper.open();\n// 1. pick up the pitcher (pitcher.grasp)\n// 2. move above the cup (cup.above) and tilt to pour\n// 3. return it upright to where it was\n" }
+  "starter": { "code": "await robot.home();\nawait gripper.open();\n// 1. pick up the pitcher (pitcher.grasp)\n// 2. move above the cup (cup.above) and tilt to pour\n// 3. return it upright to where it was\n" },
+  "demo": { "order": 70 },
+  "difficulty": 3
 }

@@ -3,5 +3,7 @@
   "editor": "blocks", "passOn": "run",
   "brief": "A part arrives on the conveyor. **Wait** until the sensor `part_present` sees it, pick it up and place it on the **fixture plate**.\n\nUse the approach targets so the gripper comes straight down onto the part.",
   "predicates": [{ "type": "countInRegion", "kind": "part", "region": "plate", "count": 1, "label": "Part placed on the fixture" }, { "type": "programCompleted" }, { "type": "noFaults" }],
-  "timeLimitSec": 900
+  "timeLimitSec": 900,
+  "demo": { "order": 30 },
+  "difficulty": 2
 }

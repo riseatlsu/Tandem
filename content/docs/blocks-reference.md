@@ -1,6 +1,6 @@
 # Block reference
 
-Programs start at the "▶ When Run is pressed" block. Blocks that aren't attached below it are greyed out and ignored.
+Programs start at the "When Run is pressed" block. Blocks that aren't attached below it are greyed out and ignored.
 
 ## Motion
 - Go home (speed %): joint move to the home configuration.

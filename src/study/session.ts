@@ -1,5 +1,5 @@
 import { get as idbGet, set as idbSet } from 'idb-keyval';
-import { EXPERIMENTS, TASKS, TASK_ORDER, type ExperimentDef } from '../content';
+import { EXPERIMENTS, TASKS, DEMO_TASKS, type ExperimentDef } from '../content';
 import { useApp, NO_FEATURES, type StudyInfo, type Workspace, type ChatMsg, type Plan } from '../store';
 import { host } from '../simHost';
 import { flush, logEvent, startLogging, type LogSink } from './logger';
@@ -22,7 +22,7 @@ export function orderTasks(seq: string[], exp: ExperimentDef, orderIndex: number
   return [...head, ...tail.slice(r), ...tail.slice(0, r)];
 }
 
-export function startDemo(taskId = TASK_ORDER[0]) {
+export function startDemo(taskId = DEMO_TASKS[0]) {
   useApp.getState().set({ mode: 'demo', study: null });
   void initFirebase().catch(() => undefined);
   host.loadTask(taskId);

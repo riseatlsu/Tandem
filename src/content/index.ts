@@ -10,15 +10,22 @@ const experimentFiles = import.meta.glob('../../content/experiments/*.json', { e
 const PoseZ = z.object({ x: z.number(), y: z.number(), z: z.number(), rx: z.number(), ry: z.number(), rz: z.number() });
 const V3Z = z.tuple([z.number(), z.number(), z.number()]);
 
-const SceneZ = z.object({
-  id: z.string(), title: z.string(), environment: z.enum(['factory', 'warehouse', 'kitchen']),
-  fixtures: z.array(z.object({ id: z.string(), kind: z.enum(['box', 'bin', 'conveyor', 'rack', 'region']), center: V3Z, size: V3Z, yaw: z.number().optional(), color: z.string().optional(), label: z.string().optional(), wall: z.number().optional(), mount: z.boolean().optional(), visualOnly: z.boolean().optional() })),
-  objects: z.array(z.object({ id: z.string(), kind: z.string(), shape: z.enum(['box', 'cylinder']), size: V3Z, position: V3Z, yaw: z.number().optional(), color: z.string().optional(), graspable: z.boolean().optional(), container: z.object({ capacity: z.number(), fill: z.number() }).optional() })),
+export const MeshRefZ = z.object({
+  file: z.string().regex(/^models\/[\w\-./ ]+\.(glb|gltf|obj|stl|dae)$/i, 'must be a .glb/.gltf/.obj/.stl/.dae file under models/'),
+  units: z.enum(['m', 'cm', 'mm', 'in']).optional(), scale: z.number().positive().optional(), upAxis: z.enum(['z', 'y']).optional(),
+  offset: V3Z.optional(), rotation: V3Z.optional(), color: z.string().optional(),
+});
+const IdZ = z.string().regex(/^[A-Za-z][\w.-]*$/, 'letters, digits, _ . - (start with a letter)');
+
+export const SceneZ = z.object({
+  id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, 'lowercase letters, digits and dashes'), title: z.string().min(1), environment: z.enum(['factory', 'warehouse', 'kitchen', 'lab', 'custom']),
+  fixtures: z.array(z.object({ id: IdZ, kind: z.enum(['box', 'bin', 'conveyor', 'rack', 'region', 'model']), center: V3Z, size: V3Z, yaw: z.number().optional(), color: z.string().optional(), label: z.string().optional(), wall: z.number().optional(), mount: z.boolean().optional(), visualOnly: z.boolean().optional(), mesh: MeshRefZ.optional() })),
+  objects: z.array(z.object({ id: IdZ, kind: z.string(), shape: z.enum(['box', 'cylinder']), size: V3Z, position: V3Z, yaw: z.number().optional(), color: z.string().optional(), graspable: z.boolean().optional(), container: z.object({ capacity: z.number(), fill: z.number() }).optional(), mesh: MeshRefZ.optional() })),
   regions: z.array(z.object({ id: z.string(), center: V3Z, size: V3Z, label: z.string().optional() })),
   io: z.object({ inputs: z.array(z.object({ name: z.string(), initial: z.union([z.boolean(), z.string()]) })), outputs: z.array(z.object({ name: z.string(), initial: z.union([z.boolean(), z.string()]) })) }),
   conveyors: z.array(z.object({
     id: z.string(), start: V3Z, end: V3Z, speed: z.number(), runOutput: z.string(), sensorInput: z.string(), colorInput: z.string().optional(),
-    spawn: z.object({ intervalSec: z.number(), jitterSec: z.number(), count: z.number(), colors: z.array(z.string()), size: V3Z, kind: z.string(), shape: z.enum(['box', 'cylinder']).optional(), prefill: z.boolean().optional() }),
+    spawn: z.object({ intervalSec: z.number(), jitterSec: z.number(), count: z.number(), colors: z.array(z.string()), size: V3Z, kind: z.string(), shape: z.enum(['box', 'cylinder']).optional(), prefill: z.boolean().optional(), mesh: MeshRefZ.optional() }),
   })),
   sceneTargets: z.record(z.string(), PoseZ),
   colorSensors: z.array(z.object({ input: z.string(), region: z.string() })).optional(),
@@ -27,8 +34,8 @@ const SceneZ = z.object({
 });
 
 const PredZ = z.object({ type: z.string() }).passthrough();
-const TaskZ = z.object({
-  id: z.string(), title: z.string(), brief: z.string(), sceneId: z.string(), armId: z.string(), seed: z.number(),
+export const TaskZ = z.object({
+  id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, 'lowercase letters, digits and dashes'), title: z.string(), brief: z.string(), sceneId: z.string(), armId: z.string(), seed: z.number(),
   editor: z.enum(['blocks', 'code']), passOn: z.enum(['run', 'live']).default('run'),
   starter: z.object({ code: z.string().optional(), blocks: z.array(z.any()).optional() }).optional(),
   presetTargets: z.record(z.string(), PoseZ).optional(),
@@ -36,11 +43,14 @@ const TaskZ = z.object({
   maxSimTimeSec: z.number().optional(), timeLimitSec: z.number().optional(),
   hints: z.array(z.string()).optional(),
   conveyorOverrides: z.record(z.string(), z.object({}).passthrough()).optional(),
+  /** Listed in the demo (level bubbles + landing gallery) at this position; tasks without it are study-only. */
+  demo: z.object({ order: z.number() }).optional(),
+  difficulty: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
 });
 export type TaskDef = Omit<z.infer<typeof TaskZ>, 'predicates' | 'presetTargets'> & { predicates: PredicateDef[]; presetTargets?: Record<string, Pose> };
 
-const ExperimentZ = z.object({
-  id: z.string(), version: z.string(),
+export const ExperimentZ = z.object({
+  id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, 'lowercase letters, digits and dashes'), version: z.string(),
   conditions: z.record(z.string(), z.object({
     agent: z.object({
       mode: z.enum(['off', 'qa', 'suggest']), model: z.string().optional(), promptVersion: z.string(),
@@ -72,7 +82,8 @@ export const SCENES: Record<string, SceneDef> = load<SceneDef>(sceneFiles, Scene
 export const TASKS: Record<string, TaskDef> = load<TaskDef>(taskFiles, TaskZ, 'task');
 export const EXPERIMENTS: Record<string, ExperimentDef> = load<ExperimentDef>(experimentFiles, ExperimentZ, 'experiment');
 
-export const TASK_ORDER = ['tut-jog-teach', 'tut-first-program', 'factory-pick-one', 'factory-bin-three', 'sort-colors', 'palletize-2x2x2', 'kitchen-pour', 'lab-tubes'];
+/** Demo level list: tasks with a `demo` entry, by `demo.order`. Study sequences come from experiments instead. */
+export const DEMO_TASKS: string[] = Object.values(TASKS).filter((t) => t.demo).sort((a, b) => a.demo!.order - b.demo!.order || a.id.localeCompare(b.id)).map((t) => t.id);
 
 /** Scene with task-specific overrides applied (conveyor spawn tweaks). */
 export function sceneForTask(task: TaskDef): SceneDef {

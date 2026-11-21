@@ -50,6 +50,24 @@ export const BLOCK_TYPES = [
 ] as const;
 
 let defined = false;
+
+// ---------- block icons: small white line drawings (no emoji), matching the interface's icon set
+const svg = (body: string, fill = false) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${fill ? '#fff' : 'none'}" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`)}`;
+const ICONS = {
+  start: svg('<path d="M7 4.8v14.4c0 .8.9 1.3 1.6.9l11.5-7.2c.6-.4.6-1.4 0-1.8L8.6 3.9C7.9 3.5 7 4 7 4.8z"/>', true),
+  home: svg('<path d="M3 11l9-7 9 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/>'),
+  move: svg('<path d="M4 12h15"/><path d="M13 6l6 6-6 6"/>'),
+  offset: svg('<path d="M5 19L18 6"/><path d="M10 6h8v8"/><path d="M4 4v4M4 4h4" opacity=".6"/>'),
+  gripOpen: svg('<path d="M6 3v8"/><path d="M18 3v8"/><path d="M6 11h12"/><path d="M12 11v10"/>'),
+  gripClose: svg('<path d="M10 3v8"/><path d="M14 3v8"/><path d="M7 11h10"/><path d="M12 11v10"/>'),
+  sensor: svg('<circle cx="12" cy="12" r="2.2"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4"/><path d="M5 5a10 10 0 0 0 0 14"/><path d="M19 5a10 10 0 0 1 0 14"/>'),
+  output: svg('<path d="M9 3v5"/><path d="M15 3v5"/><path d="M7 8h10v3a5 5 0 0 1-10 0z"/><path d="M12 16v5"/>'),
+  wait: svg('<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.8 1.8"/><path d="M9.5 2.5h5"/>'),
+  message: svg('<path d="M4 5h16v11H10l-5 4v-4H4z"/>'),
+  note: svg('<path d="M4 20l1.2-4.6L16 4.6l3.4 3.4L8.6 18.8z"/><path d="M13.8 6.8l3.4 3.4"/>'),
+};
+const icon = (src: string, alt: string) => new Blockly.FieldImage(src, 16, 16, alt);
+
 export function defineBlocks() {
   if (defined) return;
   defined = true;
@@ -57,7 +75,7 @@ export function defineBlocks() {
 
   Blockly.Blocks['program_start'] = {
     init(this: Blockly.Block) {
-      this.appendDummyInput().appendField('▶  When Run is pressed');
+      this.appendDummyInput().appendField(icon(ICONS.start, '')).appendField('When Run is pressed');
       this.setNextStatement(true);
       this.setColour(C.start);
       this.setDeletable(false);
@@ -67,7 +85,7 @@ export function defineBlocks() {
   };
   Blockly.Blocks['robot_home'] = {
     init(this: Blockly.Block) {
-      this.appendDummyInput().appendField('🏠  Go home').appendField('speed').appendField(new Blockly.FieldNumber(50, 1, 100, 1), 'SPEED').appendField('%');
+      this.appendDummyInput().appendField(icon(ICONS.home, '')).appendField('Go home').appendField('speed').appendField(new Blockly.FieldNumber(50, 1, 100, 1), 'SPEED').appendField('%');
       this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.motion);
       this.setTooltip('Move every joint back to the home position.');
     },
@@ -75,7 +93,7 @@ export function defineBlocks() {
   Blockly.Blocks['robot_move'] = {
     init(this: Blockly.Block) {
       this.appendDummyInput()
-        .appendField('➜  Move to').appendField(targetDropdown(), 'TARGET')
+        .appendField(icon(ICONS.move, '')).appendField('Move to').appendField(targetDropdown(), 'TARGET')
         .appendField(new Blockly.FieldDropdown([['joint move', 'J'], ['straight line', 'L']]), 'MODE')
         .appendField('speed').appendField(new Blockly.FieldNumber(50, 1, 100, 1), 'SPEED').appendField('%');
       this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.motion);
@@ -84,7 +102,7 @@ export function defineBlocks() {
   };
   Blockly.Blocks['robot_move_offset'] = {
     init(this: Blockly.Block) {
-      this.appendDummyInput().appendField('➜  Move to').appendField(targetDropdown(), 'TARGET').appendField('shifted by');
+      this.appendDummyInput().appendField(icon(ICONS.offset, '')).appendField('Move to').appendField(targetDropdown(), 'TARGET').appendField('shifted by');
       this.appendValueInput('DX').setCheck('Number').appendField('X');
       this.appendValueInput('DY').setCheck('Number').appendField('Y');
       this.appendValueInput('DZ').setCheck('Number').appendField('Z');
@@ -97,20 +115,20 @@ export function defineBlocks() {
   };
   Blockly.Blocks['gripper_open'] = {
     init(this: Blockly.Block) {
-      this.appendDummyInput().appendField('✋  Open gripper');
+      this.appendDummyInput().appendField(icon(ICONS.gripOpen, '')).appendField('Open gripper');
       this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.gripper);
     },
   };
   Blockly.Blocks['gripper_close'] = {
     init(this: Blockly.Block) {
-      this.appendDummyInput().appendField('✊  Close gripper');
+      this.appendDummyInput().appendField(icon(ICONS.gripClose, '')).appendField('Close gripper');
       this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.gripper);
       this.setTooltip('Close the fingers. A part between the fingers is picked up.');
     },
   };
   Blockly.Blocks['gripper_if_holding'] = {
     init(this: Blockly.Block) {
-      this.appendDummyInput().appendField('If the gripper is holding a part');
+      this.appendDummyInput().appendField(icon(ICONS.gripClose, '')).appendField('If the gripper is holding a part');
       this.appendStatementInput('DO').appendField('then');
       this.appendStatementInput('ELSE').appendField('otherwise');
       this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.gripper);
@@ -118,7 +136,7 @@ export function defineBlocks() {
   };
   Blockly.Blocks['io_wait_until'] = {
     init(this: Blockly.Block) {
-      this.appendDummyInput().appendField('⏳  Wait until').appendField(ioDropdown('inputs'), 'INPUT').appendField('is').appendField(new Blockly.FieldTextInput('true'), 'VALUE')
+      this.appendDummyInput().appendField(icon(ICONS.sensor, '')).appendField('Wait until').appendField(ioDropdown('inputs'), 'INPUT').appendField('is').appendField(new Blockly.FieldTextInput('true'), 'VALUE')
         .appendField('timeout').appendField(new Blockly.FieldNumber(0, 0, 3600, 1), 'TIMEOUT').appendField('s');
       this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.signals);
       this.setTooltip('Pause until a sensor reports a value. Timeout 0 waits forever.');
@@ -126,13 +144,13 @@ export function defineBlocks() {
   };
   Blockly.Blocks['io_set'] = {
     init(this: Blockly.Block) {
-      this.appendDummyInput().appendField('⚡  Set').appendField(ioDropdown('outputs'), 'OUTPUT').appendField('to').appendField(new Blockly.FieldTextInput('true'), 'VALUE');
+      this.appendDummyInput().appendField(icon(ICONS.output, '')).appendField('Set').appendField(ioDropdown('outputs'), 'OUTPUT').appendField('to').appendField(new Blockly.FieldTextInput('true'), 'VALUE');
       this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.signals);
     },
   };
   Blockly.Blocks['io_if'] = {
     init(this: Blockly.Block) {
-      this.appendDummyInput().appendField('If').appendField(ioDropdown('inputs'), 'INPUT').appendField('is').appendField(new Blockly.FieldTextInput('true'), 'VALUE');
+      this.appendDummyInput().appendField(icon(ICONS.sensor, '')).appendField('If').appendField(ioDropdown('inputs'), 'INPUT').appendField('is').appendField(new Blockly.FieldTextInput('true'), 'VALUE');
       this.appendStatementInput('DO').appendField('then');
       this.appendStatementInput('ELSE').appendField('otherwise');
       this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.signals);
@@ -146,19 +164,19 @@ export function defineBlocks() {
   };
   Blockly.Blocks['flow_wait'] = {
     init(this: Blockly.Block) {
-      this.appendDummyInput().appendField('⏱  Wait').appendField(new Blockly.FieldNumber(1, 0, 3600, 0.1), 'SEC').appendField('seconds');
+      this.appendDummyInput().appendField(icon(ICONS.wait, '')).appendField('Wait').appendField(new Blockly.FieldNumber(1, 0, 3600, 0.1), 'SEC').appendField('seconds');
       this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.flow);
     },
   };
   Blockly.Blocks['flow_log'] = {
     init(this: Blockly.Block) {
-      this.appendValueInput('MSG').appendField('💬  Show message');
+      this.appendValueInput('MSG').appendField(icon(ICONS.message, '')).appendField('Show message');
       this.setPreviousStatement(true); this.setNextStatement(true); this.setColour(C.flow);
     },
   };
   Blockly.Blocks['flow_note'] = {
     init(this: Blockly.Block) {
-      this.appendDummyInput().appendField('📝').appendField(new Blockly.FieldTextInput('note'), 'TEXT');
+      this.appendDummyInput().appendField(icon(ICONS.note, '')).appendField('Note').appendField(new Blockly.FieldTextInput('note'), 'TEXT');
       this.setPreviousStatement(true); this.setNextStatement(true); this.setColour('#94a3b8');
       this.setTooltip('A note for humans. Does nothing when the program runs.');
     },

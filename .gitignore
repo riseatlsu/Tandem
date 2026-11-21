@@ -16,3 +16,9 @@ firebase-debug.log*
 firestore-debug.log*
 ui-debug.log*
 .firebase/
+
+# Service-account keys and participant codes: never commit
+keys/
+*-firebase-adminsdk-*.json
+service-account*.json
+codes*.csv

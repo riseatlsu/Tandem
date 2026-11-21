@@ -4,5 +4,7 @@
   "brief": "Three parts will arrive one after another. Write a **loop** that moves every part into the reject bin.\n\nThis cell uses a different cobot — your targets still work by name.",
   "predicates": [{ "type": "countInRegion", "kind": "part", "region": "bin", "count": 3, "label": "3 parts in the bin" }, { "type": "programCompleted" }, { "type": "noFaults" }],
   "conveyorOverrides": { "infeed": { "count": 3, "intervalSec": 4 } },
-  "starter": { "code": "// Move every arriving part into the bin\nawait robot.home();\n\nfor (let i = 0; i < 3; i++) {\n  // your code here\n}\n" }
+  "starter": { "code": "// Move every arriving part into the bin\nawait robot.home();\n\nfor (let i = 0; i < 3; i++) {\n  // your code here\n}\n" },
+  "demo": { "order": 40 },
+  "difficulty": 2
 }

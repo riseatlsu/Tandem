@@ -30,15 +30,18 @@ export function HeroCell({ onScene }: { onScene?: (title: string) => void }) {
         const run = new SimCore(sceneForTask(task), ARMS[task.armId], { seed: task.seed + k });
         sim = run;
         onScene?.(run.scene.title);
-        let wall = performance.now(), simT = 0;
+        let wall = performance.now(), simT = 0, lastYield = performance.now();
         await runHeadless(run, show.src, {
           maxSimTimeSec: 240,
           onStep: async (sm) => {
             // pace simulated time to the wall clock (and hold still while the hero is off screen)
+            const now = performance.now();
+            if ((now - wall) / 1000 * SPEED - (sm.simTime - simT) > 0.25) { wall = now; simT = sm.simTime; } // slow machine: drop the backlog, don't fast-forward
             while (!stopped && (sm.simTime - simT) > ((performance.now() - wall) / 1000) * SPEED) {
-              await frame();
+              await frame(); lastYield = performance.now();
               if (s3.paused) { wall = performance.now(); simT = sm.simTime; }
             }
+            if (performance.now() - lastYield > 12) { await frame(); lastYield = performance.now(); } // always let the page breathe
             if (stopped) throw new Error('stopped');
           },
         }).catch(() => undefined);

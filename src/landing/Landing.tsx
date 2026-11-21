@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { HeroCell } from './HeroCell';
 import { RobotLineup } from './RobotLineup';
-import { TASKS, TASK_ORDER, SCENES } from '../content';
+import { TASKS, DEMO_TASKS, SCENES } from '../content';
 import { clipUrl } from '../agent/clips';
 import { useApp } from '../store';
 import { sound } from '../audio/sound';
@@ -19,8 +19,7 @@ const FEATURES = [
   { clip: 'fault-recover', eyebrow: 'Real simulation', title: 'Safe to break, honest about why', text: 'Every motion is checked for reach, joint limits, singularities and collisions before the arm moves. Mistakes stop the program and point at the exact block.', points: ['Collision and reach checks', 'Conveyors, sensors and liquids', 'Deterministic replays'] },
 ];
 
-const ENV_LABEL: Record<string, string> = { factory: 'Factory', warehouse: 'Warehouse', kitchen: 'Kitchen & lab' };
-const DIFFICULTY: Record<string, number> = { 'tut-jog-teach': 1, 'tut-first-program': 1, 'factory-pick-one': 2, 'factory-bin-three': 2, 'sort-colors': 2, 'palletize-2x2x2': 3, 'kitchen-pour': 3, 'lab-tubes': 3 };
+const ENV_LABEL: Record<string, string> = { factory: 'Factory', warehouse: 'Warehouse', kitchen: 'Kitchen & lab', lab: 'Lab', custom: 'Custom' };
 
 /** Adds `.in` to elements with `.reveal` as they scroll into view. */
 function useReveal() {
@@ -71,7 +70,7 @@ export default function Landing() {
     addEventListener('scroll', f, { passive: true });
     return () => { removeEventListener('scroll', f); document.documentElement.classList.remove('is-landing'); };
   }, []);
-  const levels = TASK_ORDER.filter((id) => TASKS[id]);
+  const levels = DEMO_TASKS.filter((id) => TASKS[id]);
 
   return (
     <div className="landing">
@@ -152,7 +151,7 @@ export default function Landing() {
                   <div className="row">
                     <span className="chip">{ENV_LABEL[sc?.environment ?? ''] ?? sc?.title}</span>
                     <span className={`chip ${t.editor === 'blocks' ? 'leaf' : 'aqua'}`}>{t.editor === 'blocks' ? 'Blocks' : 'Code'}</span>
-                    <span className="stars" aria-label={`Difficulty ${DIFFICULTY[id] ?? 2} of 3`}>{[1, 2, 3].map((s) => <i key={s} className={s <= (DIFFICULTY[id] ?? 2) ? 'on' : ''} />)}</span>
+                    <span className="stars" aria-label={`Difficulty ${t.difficulty ?? 2} of 3`}>{[1, 2, 3].map((s) => <i key={s} className={s <= (t.difficulty ?? 2) ? 'on' : ''} />)}</span>
                   </div>
                 </div>
               </a>

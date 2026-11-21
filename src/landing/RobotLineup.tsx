@@ -38,7 +38,16 @@ export function RobotLineup() {
   armRef.current = arms[i];
   const specs = useMemo(() => arms.map((a) => ({ reach: reachMm(a), speed: Math.round((a as ArmDef & { maxTcpSpeed?: number }).maxTcpSpeed ?? 0) })), [arms]);
 
+  // create the 3D view only when the lineup scrolls near the viewport (saves a WebGL context + shader compiles at load)
+  const [near, setNear] = useState(false);
   useEffect(() => {
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setNear(true); io.disconnect(); } }, { rootMargin: '600px' });
+    io.observe(host.current!);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!near) return;
     const el = host.current!;
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(2, devicePixelRatio));
@@ -95,7 +104,7 @@ export function RobotLineup() {
     };
     loop();
     return () => { cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); robot?.dispose(); renderer.dispose(); el.removeChild(renderer.domElement); };
-  }, []);
+  }, [near]);
 
   useEffect(() => {
     if (!auto) return;

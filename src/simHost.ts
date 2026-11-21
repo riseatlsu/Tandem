@@ -117,7 +117,7 @@ class SimHost {
     this.syncTargets();
     const runId = `r${Date.now().toString(36)}${(++this.runCounter).toString(36)}`;
     useApp.getState().set({ fault: null, showSuccess: false, lastTrace: null });
-    consoleLog(`▶ Run started`, 'info', this.sim.simTime);
+    consoleLog('Run started', 'info', this.sim.simTime);
     this.runner.speed = useApp.getState().speed;
     this.runner.start(src, { predicates: this.task.predicates, seed: this.task.seed, runId, maxSimTimeSec: this.task.maxSimTimeSec });
     logEvent('run_start', { runId, programHash: hashOf(src), seed: this.task.seed, speed: this.runner.speed, editor: currentWorkspace().editor });
@@ -133,10 +133,10 @@ class SimHost {
     st.set({ lastTrace: trace });
     if (trace.fault && trace.outcome !== 'stopped') {
       st.set({ fault: trace.fault, highlight: { line: trace.fault.line, blockId: trace.fault.blockId } });
-      consoleLog(`■ ${trace.fault.code}: ${trace.fault.message}${trace.fault.line ? ` (line ${trace.fault.line})` : ''}`, 'fault', this.sim.simTime, trace.fault.line);
+      consoleLog(`Stopped: ${trace.fault.code}: ${trace.fault.message}${trace.fault.line ? ` (line ${trace.fault.line})` : ''}`, 'fault', this.sim.simTime, trace.fault.line);
       logEvent('run_fault', { runId: trace.runId, code: trace.fault.code, line: trace.fault.line, blockId: trace.fault.blockId });
     } else {
-      consoleLog(trace.outcome === 'stopped' ? '■ Stopped' : `✓ Program finished in ${trace.simDurationSec.toFixed(1)} s (simulated)`, 'info', this.sim.simTime);
+      consoleLog(trace.outcome === 'stopped' ? 'Stopped' : `Program finished in ${trace.simDurationSec.toFixed(1)} s (simulated)`, 'info', this.sim.simTime);
     }
     this.refreshPredicates(true);
     logEvent('run_end', { runId: trace.runId, outcome: trace.outcome, predicates: trace.predicates, simDurationSec: trace.simDurationSec, trace });

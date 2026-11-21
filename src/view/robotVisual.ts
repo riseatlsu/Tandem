@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
-import type { ArmDef } from '../sim/types';
+import type { ArmDef, MeshRef } from '../sim/types';
+import { glossy } from './materials';
+import { loadModel, attachModel } from './meshes';
 import { fk } from '../sim/kinematics/fk';
 import { pos, sub, norm, type M4 } from '../sim/math/mat4';
 
@@ -35,9 +37,9 @@ const UAIBOT: Record<'kuka_kr5' | 'epson_t6', Placement[]> = {
   ],
 };
 
-export function glossy(color: string, opts: Partial<THREE.MeshPhysicalMaterialParameters> = {}) {
-  return new THREE.MeshPhysicalMaterial({ color, roughness: 0.32, metalness: 0.0, clearcoat: 0.8, clearcoatRoughness: 0.18, ...opts });
-}
+export { glossy };
+
+function depthOf(o: THREE.Object3D) { let d = 0; for (let p = o.parent; p; p = p.parent) d++; return d; }
 
 export class RobotVisual {
   group = new THREE.Group();
@@ -63,6 +65,7 @@ export class RobotVisual {
       this.group.add(g);
     });
     if (arm.visual.source === 'uaibot') this.loadUaibot(arm.visual.model);
+    else if (arm.visual.source === 'mesh') this.loadMeshes(arm.visual);
     else this.buildProcedural(arm.visual.color, arm.visual.accent);
     this.buildGripper();
     this.unshadow();
@@ -86,6 +89,52 @@ export class RobotVisual {
         this.frames[p.frame].add(root);
         this.unshadow();
       });
+    }
+  }
+
+  /** Your own arm models: per-link files and/or one file with named nodes (see ArmDef.visual). */
+  private loadMeshes(v: Extract<ArmDef['visual'], { source: 'mesh' }>) {
+    const zero = fk(this.arm, new Array(this.arm.dof).fill(0)).frames;
+    const linkIndex = (l: number | string) => (typeof l === 'number' ? l : this.arm.links.findIndex((x) => x.name === l));
+    // a holder inside a link frame; 'zero' = the model was built in place with every joint at 0
+    const holder = (idx: number, frame: 'link' | 'zero' | undefined) => {
+      const h = new THREE.Group();
+      h.matrixAutoUpdate = false;
+      if (frame === 'zero') h.matrix.fromArray(zero[idx]).invert();
+      this.frames[idx].add(h);
+      return h;
+    };
+    const adopt = (g: THREE.Object3D) => {
+      g.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh) return;
+        if (this.ghostMat) { m.material = this.ghostMat; m.castShadow = false; m.receiveShadow = false; m.renderOrder = 5; }
+        else for (const mat of Array.isArray(m.material) ? m.material : [m.material]) if ((mat as THREE.MeshStandardMaterial).emissive) this.mats.push(mat as THREE.MeshPhysicalMaterial);
+      });
+    };
+    for (const p of v.parts ?? []) {
+      const idx = linkIndex(p.link);
+      if (idx < 0 || idx >= this.frames.length) { console.warn(`[models] arm ${this.arm.id}: unknown link ${p.link}`); continue; }
+      attachModel(holder(idx, p.frame), p, 'none', [0.04, 0.04, 0.04], adopt);
+    }
+    if (v.model) {
+      const { nodes, frame = 'zero', ...ref } = v.model;
+      loadModel(ref as MeshRef, 'none').then((root) => {
+        root.updateMatrixWorld(true);
+        const entries = Object.entries(nodes).map(([name, link]) => ({ node: root.getObjectByName(name), idx: linkIndex(link), name }));
+        for (const e of entries) if (!e.node || e.idx < 0) console.warn(`[models] arm ${this.arm.id}: node "${e.name}" or its link not found`);
+        const ok = entries.filter((e) => e.node && e.idx >= 0).map((e) => ({ ...e, world: e.node!.matrixWorld.clone(), depth: depthOf(e.node!) }));
+        ok.sort((a, b) => b.depth - a.depth); // detach children before their parents
+        for (const e of ok) {
+          e.node!.removeFromParent();
+          e.node!.matrixAutoUpdate = false;
+          e.node!.matrix.copy(e.world);
+          holder(e.idx, frame).add(e.node!);
+          adopt(e.node!);
+        }
+        holder(0, frame).add(root); // anything not mapped rides on the base
+        adopt(root);
+      }).catch((err) => console.warn(`[models] could not load ${v.model!.file}:`, err?.message ?? err));
     }
   }
 

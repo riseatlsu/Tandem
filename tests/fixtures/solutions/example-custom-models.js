@@ -1,0 +1,11 @@
+await robot.home();
+await gripper.open();
+await robot.moveJ('widget.approach');
+await robot.moveL('widget', { speed: 30 });
+await gripper.close();
+await robot.moveL('widget.approach');
+await robot.moveL('tray.approach');
+await robot.moveL('tray.place', { speed: 30 });
+await gripper.open();
+await robot.moveL('tray.approach');
+await robot.home();

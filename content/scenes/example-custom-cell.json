@@ -1,0 +1,109 @@
+{
+  "id": "example-custom-cell",
+  "title": "Custom models example",
+  "environment": "custom",
+  "fixtures": [
+    {
+      "id": "table",
+      "kind": "box",
+      "center": [250, 0, -20],
+      "size": [1400, 1200, 40],
+      "color": "#e9eef3",
+      "mount": true
+    },
+    {
+      "id": "machine",
+      "kind": "model",
+      "center": [-180, 520, 370],
+      "size": [520, 420, 740],
+      "mesh": {
+        "file": "models/examples/props/machine.glb"
+      },
+      "label": "CNC"
+    },
+    {
+      "id": "crate",
+      "kind": "model",
+      "center": [-250, -420, 105],
+      "size": [320, 220, 210],
+      "visualOnly": true,
+      "mesh": {
+        "file": "models/examples/props/crate.obj",
+        "upAxis": "z"
+      }
+    },
+    {
+      "id": "tray_plate",
+      "kind": "box",
+      "center": [450, 250, 10],
+      "size": [200, 200, 20],
+      "color": "#9fb4c8",
+      "label": "Tray"
+    }
+  ],
+  "objects": [
+    {
+      "id": "widget",
+      "kind": "widget",
+      "shape": "cylinder",
+      "size": [40, 40, 50],
+      "position": [450, -200, 0],
+      "color": "orange",
+      "graspable": true,
+      "mesh": {
+        "file": "models/examples/props/widget.stl"
+      }
+    }
+  ],
+  "regions": [
+    {
+      "id": "tray",
+      "center": [450, 250, 50],
+      "size": [120, 120, 60],
+      "label": "Tray"
+    }
+  ],
+  "io": {
+    "inputs": [],
+    "outputs": []
+  },
+  "conveyors": [],
+  "camera": {
+    "position": [1650, -1450, 1150],
+    "target": [260, -20, 280]
+  },
+  "sceneTargets": {
+    "widget.approach": {
+      "x": 450,
+      "y": -200,
+      "z": 170,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    },
+    "widget": {
+      "x": 450,
+      "y": -200,
+      "z": 30,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    },
+    "tray.approach": {
+      "x": 450,
+      "y": 250,
+      "z": 200,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    },
+    "tray.place": {
+      "x": 450,
+      "y": 250,
+      "z": 52,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    }
+  }
+}

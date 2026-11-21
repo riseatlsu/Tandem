@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../store';
-import { TASKS, TASK_ORDER } from '../content';
+import { TASKS, DEMO_TASKS } from '../content';
 import { host } from '../simHost';
 import { Icon } from '../ui/icons';
 import { advanceTask } from '../study/session';
@@ -58,7 +58,7 @@ export function Topbar() {
           </div>
         ) : (
           <div className="tracker" role="group" aria-label="Choose task">
-            <Bubbles ids={TASK_ORDER} current={taskId} passed={passed} onPick={(t) => { if (t !== taskId) host.loadTask(t); }} />
+            <Bubbles ids={DEMO_TASKS} current={taskId} passed={passed} onPick={(t) => { if (t !== taskId) host.loadTask(t); }} />
             <span className="tracker-text"><span className="title">{task?.title}</span></span>
           </div>
         )}

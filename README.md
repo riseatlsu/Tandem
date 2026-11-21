@@ -34,6 +34,17 @@ VITE_BASE=/ npm run dev                                 # terminal 2: http://loc
 | `npm run lint && npm run typecheck` | Static checks |
 | `npm run build` | Static site in `dist/` (`VITE_BASE` sets the Pages sub-path) |
 
+## Creating content (Tandem Studio)
+
+Run `VITE_BASE=/ npm run dev` and open `http://localhost:5173/?editor`. Studio saves straight into `content/` and `tests/fixtures/solutions/`. Commit and push to publish. The deployed site has no editor.
+
+- **Environments:** tables, bins, conveyors, parts, zones, sensors and named positions, in a live 3D preview.
+- **Tasks:** brief, goals and starter program, plus whether (and where) the task appears in the demo. A reference solution must pass before you can save.
+- **Experiments:** conditions, AI mode, model and features, and task order. Then generate codes as below.
+- **Robots & models:** put `.glb`/`.gltf`/`.obj`/`.stl`/`.dae` files (or a robot's URDF folder) anywhere in `public/models/`. Then preview them, import a URDF, or build an arm from per-link meshes or one GLB with named parts. Models are visual only; collisions use simple shapes.
+
+Examples are in `public/models/examples/`: the "Tandem Mini 6" URDF arm, plus the `example-custom-cell` environment and the `example-custom-models` task, which isn't listed in the demo (open it with `/?demo=example-custom-models`).
+
 ## Deploying
 
 **Frontend: GitHub Pages**
@@ -57,11 +68,14 @@ VITE_BASE=/ npm run dev                                 # terminal 2: http://loc
 
 **Running a study**
 
+1. Download a service-account key once: Firebase console > Project settings > Service accounts > Generate new private key. Save it in `keys/` (gitignored, never served) or add it from Studio.
+2. Run `VITE_BASE=/ npm run dev`, open `localhost:5173/?editor` > Experiments > your experiment > **Participant codes**, choose how many per condition and click Generate. You get each code with its link, a Copy all links button and a CSV (also saved to `exports/codes/`). **Show issued codes** shows which have been started.
+
+The same from the terminal:
+
 ```bash
-GOOGLE_APPLICATION_CREDENTIALS=~/keys/tandem-admin.json \
-  npx tsx scripts/gen-codes.ts --experiment pilot --per-condition 20 --project <id> > codes.csv   # writes codes/{CODE} docs + CSV
-# hand out https://<user>.github.io/FactorySim/?code=ABCD-EFGH (one code per participant; the link skips the landing page)
-npx tsx scripts/export-logs.ts --experiment pilot --project <id> --out exports/pilot
+npx tsx scripts/gen-codes.ts --experiment pilot --per-condition 20 > codes.csv   # uses the key in keys/; codes*.csv is gitignored
+npx tsx scripts/export-logs.ts --experiment pilot --project tandem-cobot --out exports/pilot
 ```
 
 Participants open `https://<you>.github.io/<repo>/?code=XXXX-XXXX`. Experiments live in `content/experiments/*.json` and define the conditions (AI off / Q&A / suggest, a locked model), the task order with Latin-square counterbalancing, and the post-survey redirect.

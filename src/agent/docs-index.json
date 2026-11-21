@@ -75,7 +75,7 @@
   "id": "blocks-reference#12",
   "doc": "blocks-reference",
   "title": "Block reference",
-  "text": "Programs start at the \"▶ When Run is pressed\" block. Blocks that aren't attached below it are greyed out and ignored."
+  "text": "Programs start at the \"When Run is pressed\" block. Blocks that aren't attached below it are greyed out and ignored."
  },
  {
   "id": "blocks-reference#13",
