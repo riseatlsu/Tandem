@@ -15,7 +15,7 @@ npm run test:e2e                     # Playwright: builds with --mode e2e, start
 npx playwright test tests/e2e/study.spec.ts               # single E2E file
 npm run test:functions               # functions + Firestore rules in Firebase emulators (needs Java)
 npm run lint && npm run typecheck
-npm run build                        # docs index → tsc → vite build (VITE_BASE defaults to /FactorySim/)
+npm run build                        # docs index → tsc → vite build (VITE_BASE defaults to /Tandem/)
 npm run docs:index                   # content/docs/*.md → src/agent/docs-index.json (re-run after editing docs)
 VITE_BASE=/ npm run dev  →  /?editor # Tandem Studio: build environments, tasks, experiments, arms (dev server only; saves into content/)
 npx tsx scripts/gen-codes.ts --experiment pilot --per-condition 10 --dry-run   # participant codes + links (Studio > Experiments does it with buttons)

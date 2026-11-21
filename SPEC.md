@@ -1,6 +1,6 @@
 # Tandem — Specification v1
 
-> Product name: **Tandem** (“Program cobots, together”). Repository: FactorySim.
+> Product name: **Tandem** (“Program cobots, together”). Repository: riseatlsu/Tandem.
 
 A browser-based simulator for programming an articulated collaborative robot arm in several scenarios (factory, palletizing/sorting, kitchen/lab). Users program it in a Wizard-style block editor or a JavaScript/TypeScript editor, helped by an AI partner that runs in the browser (LangGraph.js). The app also serves as a research instrument: in **study mode** it logs how participants program, with and without AI help.
 
@@ -142,7 +142,7 @@ These decisions were made while building v1. They take precedence over the secti
 
 | Concern | Choice |
 |---|---|
-| Build | Vite + TypeScript (strict), `base: '/FactorySim/'` for GitHub Pages |
+| Build | Vite + TypeScript (strict), `base: '/Tandem/'` for GitHub Pages |
 | UI | React 18, Zustand |
 | 3D | UAIbotJS (vendored, pinned; see §18 R1) on Three.js; Three.js `TransformControls` for the hand-guide gizmo |
 | Math | Own small linear-algebra module (`src/sim/math/`): Vec3, Mat4, Quat, DH. math.js only inside the UAIbot adapter |
@@ -158,7 +158,7 @@ These decisions were made while building v1. They take precedence over the secti
 ## 4. Repository layout
 
 ```
-FactorySim/
+Tandem/
 ├─ SPEC.md
 ├─ index.html
 ├─ vite.config.ts
@@ -627,7 +627,7 @@ A checkpoint is written to `checkpoint/current` (and IndexedDB) on every `progra
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ FactorySim  [Task 2/6: Sort by color]   ⏱ 08:41   [mode: Study P-7F3K]    │
+│ Tandem      [Task 2/6: Sort by color]   ⏱ 08:41   [mode: Study P-7F3K]    │
 ├───────────────┬───────────────────────────────────┬──────────────────────┤
 │ Task          │                                   │  AI Partner          │
 │  brief        │         3D Viewport               │  (hidden if off)     │

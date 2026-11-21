@@ -92,7 +92,7 @@ export function CodesPanel({ exp, dirty, saved }: { exp: ExperimentDef; dirty: b
 
           <div className="codes-form">
             <Field label="Codes per condition" hint={`${conds.length} conditions (${conds.join(', ')}) → ${total} codes`}><Num min={1} max={500} value={per} onChange={setPer} /></Field>
-            <Field label="Site address" hint="links are this address + ?code=…"><Text mono value={site} onChange={setSiteUrl} placeholder="https://you.github.io/FactorySim/" /></Field>
+            <Field label="Site address" hint="links are this address + ?code=…"><Text mono value={site} onChange={setSiteUrl} placeholder="https://you.github.io/Tandem/" /></Field>
           </div>
           <div className="row">
             {!confirm

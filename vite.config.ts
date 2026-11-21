@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import { studioPlugin } from './scripts/vite/studio-plugin';
 
 export default defineConfig({
-  base: process.env.VITE_BASE ?? '/FactorySim/',
+  base: process.env.VITE_BASE ?? '/Tandem/',
   plugins: [react(), studioPlugin()], // studio = dev-only content editor API (?editor)
   worker: { format: 'es' },
   // keys/ holds service-account keys for Studio's code generator: never serve them, even from the dev server.
