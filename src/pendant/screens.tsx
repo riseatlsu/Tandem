@@ -273,7 +273,7 @@ export function SettingsScreen() {
         </div>
       )}
       <div className="settings-group about">
-        <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" />
+        <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" />
         <span><b>Tandem</b><small>{host.sim ? ARMS[host.armId()]?.name : ''} · {host.sim?.scene.title}</small></span>
         <button className="btn sm" style={{ marginLeft: 'auto' }} disabled={running} onClick={() => startTour()}>Take the tour</button>
       </div>

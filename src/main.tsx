@@ -31,7 +31,7 @@ function boot() {
   useApp.subscribe((s, p) => { if (s.mode !== p.mode || s.route !== p.route || s.landingMusic !== p.landingMusic) syncMusic(); });
 
   function Splash() {
-    return <div className="splash" aria-busy="true"><img src={`${import.meta.env.BASE_URL}logo.svg`} alt="Tandem" /></div>;
+    return <div className="splash" aria-busy="true"><img src={`${import.meta.env.BASE_URL}logo.png`} alt="Tandem" /></div>;
   }
   function NoStudio() {
     return <div className="splash"><div className="glass" style={{ padding: 28, borderRadius: 20, maxWidth: 460, textAlign: 'center' }}><h2>Tandem Studio runs locally</h2><p>Start the dev server (<code>VITE_BASE=/ npm run dev</code>) and open <code>localhost:5173/?editor</code>.</p></div></div>;

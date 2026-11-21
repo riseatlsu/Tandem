@@ -54,7 +54,7 @@ export default function Studio() {
   return (
     <div className="studio">
       <header className="st-head glass">
-        <a className="st-brand" href={import.meta.env.BASE_URL}><img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" /> Tandem <b>Studio</b></a>
+        <a className="st-brand" href={import.meta.env.BASE_URL}><img src={`${import.meta.env.BASE_URL}logo.png`} alt="" /> Tandem <b>Studio</b></a>
         <nav className="st-tabs" aria-label="Studio sections">{TABS.map((t) => <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>{t.label}</button>)}</nav>
         <span className="grow" />
         {flash && <span className="chip leaf">{flash}</span>}

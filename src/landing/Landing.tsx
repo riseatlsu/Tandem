@@ -75,7 +75,7 @@ export default function Landing() {
   return (
     <div className="landing">
       <nav className={`l-nav ${scrolled ? 'solid' : ''}`} aria-label="Main">
-        <a className="l-brand" href={BASE}><img src={`${BASE}logo.svg`} alt="" /><span>Tandem</span></a>
+        <a className="l-brand" href={BASE}><img src={`${BASE}logo.png`} alt="" /><span>Tandem</span></a>
         <div className="l-links">
           <a href="#features">Features</a><a href="#levels">Levels</a><a href="#robots">Robots</a>
         </div>
@@ -167,7 +167,7 @@ export default function Landing() {
 
       <section className="l-final reveal">
         <div className="glass l-final-card">
-          <img src={`${BASE}logo.svg`} alt="" />
+          <img src={`${BASE}logo.png`} alt="" />
           <h2>Ready to teach your first robot?</h2>
           <p>Start with a three-minute guided tour, or jump straight into the demo.</p>
           <div className="l-cta center">

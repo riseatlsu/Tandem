@@ -46,7 +46,7 @@ export function Pendant() {
         <header className="pd-status">
           {!inDock ? (
             <button className="pd-back" onClick={() => go('home')}><Icon.back width={16} height={16} /> Home</button>
-          ) : <span className="pd-brand"><img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" /></span>}
+          ) : <span className="pd-brand"><img src={`${import.meta.env.BASE_URL}logo.png`} alt="" /></span>}
           <span className="pd-title">{TITLES[screen]}</span>
           <span className="grow" />
           {agentMode() !== 'off' && <AgentButton />}

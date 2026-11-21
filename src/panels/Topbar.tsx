@@ -35,12 +35,12 @@ export function Topbar() {
     <header className="glass topbar">
       {mode === 'demo' ? (
         <a className="brand" href={BASE} title="Back to the Tandem home page">
-          <img src={`${BASE}logo.svg`} alt="" />
+          <img src={`${BASE}logo.png`} alt="" />
           <div><div className="word">Tandem</div><div className="tag">Program cobots, together</div></div>
         </a>
       ) : (
         <div className="brand">
-          <img src={`${BASE}logo.svg`} alt="" />
+          <img src={`${BASE}logo.png`} alt="" />
           <div><div className="word">Tandem</div><div className="tag">Program cobots, together</div></div>
         </div>
       )}

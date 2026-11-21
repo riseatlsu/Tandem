@@ -69,7 +69,7 @@ function MobileBlock() {
   return (
     <div className="mobile-block">
       <div className="glass gate-card">
-        <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" />
+        <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" />
         <h1>Tandem</h1>
         <p>Tandem needs a larger screen. Please open it on a desktop or laptop browser (Chrome, Edge or Firefox).</p>
       </div>

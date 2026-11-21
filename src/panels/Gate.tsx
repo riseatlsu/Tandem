@@ -18,7 +18,7 @@ export function Gate({ initialCode, onDone }: { initialCode: string; onDone(): v
   return (
     <div className="gate">
       <div className="glass gate-card">
-        <img src={`${BASE}logo.svg`} alt="Tandem logo" />
+        <img src={`${BASE}logo.png`} alt="Tandem logo" />
         <h1>Tandem</h1>
         <p>Welcome to the study. Enter the participant code you were given.</p>
         <form onSubmit={(e) => { e.preventDefault(); void go(); }} className="stack">
