@@ -92,6 +92,14 @@ export function TourOverlay() {
     return () => { clearInterval(id); removeEventListener('resize', measure); };
   }, [step?.id, step?.target]);  
   useLayoutEffect(() => { if (card.current) setCardSize({ w: card.current.offsetWidth, h: card.current.offsetHeight }); }, [step?.id, rect !== null]);
+  // the card grows when its example GIF loads: keep measuring so it never ends up partly off-screen
+  useEffect(() => {
+    const el = card.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setCardSize((p) => (p.w === el.offsetWidth && p.h === el.offsetHeight ? p : { w: el.offsetWidth, h: el.offsetHeight })));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [step?.id]);
 
   useEffect(() => {
     if (!tour) return;
@@ -141,7 +149,7 @@ export function TourOverlay() {
   return createPortal(
     <div className="tour" role="dialog" aria-modal="false" aria-label={`Tour step ${index + 1} of ${steps.length}: ${step.title}`}>
       {rect ? (
-        <div className="tour-spot" style={{ left: rect.left - PAD, top: rect.top - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2 }} />
+        <div className="tour-spot" data-target={step.target} style={{ left: rect.left - PAD, top: rect.top - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2 }} />
       ) : <div className="tour-dim" />}
       {arrow && (
         <div className={`tour-arrow ${arrow.dir}`} style={{ left: arrow.x, top: arrow.y }} aria-hidden>

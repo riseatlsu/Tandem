@@ -6,7 +6,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import type { SimCore } from '../sim/SimCore';
 import type { FixtureDef, MeshRef, ObjState, SceneDef, Target } from '../sim/types';
 import { poseToM4 } from '../sim/kinematics/arm';
-import { apply, col, pos, type M4 } from '../sim/math/mat4';
+import { apply, col, mul, pos, type M4 } from '../sim/math/mat4';
 import { RobotVisual } from './robotVisual';
 import { glossy } from './materials';
 import { attachModel, placeholder } from './meshes';
@@ -77,8 +77,11 @@ export class Scene3D {
   private tc: TransformControls;
   private proxy = new THREE.Object3D();
   private world = new THREE.Group();
-  private robot: RobotVisual | null = null;
+  /** One visual per arm, each inside a holder group placed at the arm's base. */
+  private robots = new Map<string, { vis: RobotVisual; holder: THREE.Group; key: string; label?: THREE.Sprite }>();
   private robotArmId = '';
+  /** The arm the TCP marker, hand-guide gizmo and target frames belong to (set by the viewport). */
+  selectedArm: string | null = null;
   private objMeshes = new Map<string, THREE.Group>();
   private targetGroup = new THREE.Group();
   private belts: { tex: THREE.Texture; speed: number; runOutput: string; len: number }[] = [];
@@ -92,7 +95,7 @@ export class Scene3D {
   private raf = 0;
   private lastT = performance.now();
   private targetsKey = '';
-  private ghost: RobotVisual | null = null;
+  private ghosts = new Map<string, { vis: RobotVisual; holder: THREE.Group; key: string }>();
   private ghostClip: GhostClip | null = null;
   private ghostT = 0;
   private offGhost: () => void;
@@ -182,7 +185,7 @@ export class Scene3D {
       (this.tcpMarker.material as THREE.MeshBasicMaterial).color.set(ok ? '#2fb84a' : '#ef4b5f');
     });
 
-    this.offGhost = onGhost((clip) => { this.ghostClip = clip && clip.frames.length ? clip : null; this.ghostT = 0; if (this.ghost) this.ghost.group.visible = !!this.ghostClip; });
+    this.offGhost = onGhost((clip) => { this.ghostClip = clip && clip.frames.length ? clip : null; this.ghostT = 0; for (const g of this.ghosts.values()) g.holder.visible = !!this.ghostClip; });
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(host);
     this.resize();
@@ -198,7 +201,8 @@ export class Scene3D {
     (this.tcpMarker.material as THREE.MeshBasicMaterial).color.set(on ? '#2fb84a' : '#1a8cff');
   }
 
-  flashFault() { this.robot?.triggerFlash(); }
+  /** Flash an arm red (all arms when `robot` is not given). */
+  flashFault(robot?: string) { for (const [id, r] of this.robots) if (!robot || id === robot) r.vis.triggerFlash(); }
 
   private resize() {
     const w = this.host.clientWidth, h = this.host.clientHeight;
@@ -224,6 +228,18 @@ export class Scene3D {
       for (let o: THREE.Object3D | null = hit.object; o; o = o.parent) if (o.userData.editId) return o.userData.editId as string;
     }
     return null;
+  }
+  /** The arm under a pointer position (multi-arm cells), or null. */
+  pickArm(clientX: number, clientY: number): string | null {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1), this.camera);
+    let best: { id: string; d: number } | null = null;
+    for (const [id, rb] of this.robots) {
+      const hit = ray.intersectObject(rb.vis.group, true)[0];
+      if (hit && (!best || hit.distance < best.d)) best = { id, d: hit.distance };
+    }
+    return best?.id ?? null;
   }
   /** Shows a move gizmo at `posMm` (null hides it) and outlines the selected item. */
   setEditTarget(editId: string | null, posMm: [number, number, number] | null, onMove?: (posMm: [number, number, number]) => void) {
@@ -422,12 +438,13 @@ export class Scene3D {
     return g;
   }
 
-  private buildTargets(targets: Record<string, Target>) {
-    this.targetGroup.clear();
+  /** Target frames; `base` places one arm's targets (they are in its base frame) and `tint` colors their dots. */
+  private buildTargets(targets: Record<string, Target>, base?: M4, tint?: string, clear = true) {
+    if (clear) this.targetGroup.clear();
     for (const t of Object.values(targets)) {
       const g = new THREE.Group();
       g.matrixAutoUpdate = false;
-      g.matrix.fromArray(poseToM4(t.pose));
+      g.matrix.fromArray(base ? mul(base, poseToM4(t.pose)) : poseToM4(t.pose));
       const taught = t.source !== 'scene';
       const L = 0.035;
       const axes: [string, THREE.Euler][] = [['#ef4b5f', new THREE.Euler(0, 0, -Math.PI / 2)], ['#36c25a', new THREE.Euler(0, 0, 0)], ['#2d8cf0', new THREE.Euler(Math.PI / 2, 0, 0)]];
@@ -437,7 +454,7 @@ export class Scene3D {
         m.rotation.copy(e);
         g.add(m);
       }
-      const dot = new THREE.Mesh(new THREE.SphereGeometry(taught ? 0.008 : 0.006, 16, 10), new THREE.MeshBasicMaterial({ color: taught ? '#1a8cff' : '#8aa0b8' }));
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(taught ? 0.008 : 0.006, 16, 10), new THREE.MeshBasicMaterial({ color: taught ? tint ?? '#1a8cff' : '#8aa0b8' }));
       g.add(dot);
       const s = labelSprite(t.name, taught ? '#0b5fc4' : '#3a5372', taught ? 'rgba(232,246,255,0.92)' : 'rgba(255,255,255,0.8)');
       s.scale.multiplyScalar(0.72);
@@ -462,15 +479,43 @@ export class Scene3D {
       }
       this.lastSimTime = sim.simTime;
     }
-    if (sim.arm.id !== this.robotArmId || !this.robot) {
-      if (this.robot) { this.scene.remove(this.robot.group); this.robot.dispose(); }
-      this.robot = new RobotVisual(sim.arm);
-      this.robotArmId = sim.arm.id;
-      this.scene.add(this.robot.group);
+    // arms: (re)build when the arm set or a model changes
+    const armKey = sim.robotIds.map((id) => `${id}:${sim.armOf(id).id}:${sim.baseOf(id).join(',')}`).join('|');
+    if (armKey !== this.robotArmId) {
+      for (const r of this.robots.values()) { this.scene.remove(r.holder); r.vis.dispose(); }
+      this.robots.clear();
+      for (const id of sim.robotIds) {
+        const holder = new THREE.Group();
+        holder.matrixAutoUpdate = false;
+        holder.matrix.fromArray(sim.baseOf(id));
+        const vis = new RobotVisual(sim.armOf(id));
+        holder.add(vis.group);
+        let label: THREE.Sprite | undefined;
+        if (sim.multi && !this.showcase) {
+          label = labelSprite(sim.label(id), sim.color(id) ?? '#0d2240');
+          label.scale.multiplyScalar(0.9);
+          label.position.set(0, 0, 0.02);
+          holder.add(label);
+          const ring = new THREE.Mesh(new THREE.RingGeometry(0.11, 0.125, 48), new THREE.MeshBasicMaterial({ color: sim.color(id) ?? '#1a8cff', transparent: true, opacity: 0.7, side: THREE.DoubleSide }));
+          ring.position.z = 0.002;
+          holder.add(ring);
+        }
+        this.scene.add(holder);
+        this.robots.set(id, { vis, holder, key: id, label });
+      }
+      this.robotArmId = armKey;
     }
     const s = sim.s;
-    const held = s.holding ? s.objects.find((o) => o.id === s.holding!.id) : null;
-    const f = this.robot.update(s.q, s.gripperOpen, held ? Math.min(held.size[0], held.size[1]) : null, dt);
+    const sel = this.selectedArm && sim.robotIds.includes(this.selectedArm) ? this.selectedArm : sim.primary;
+    let f = null as ReturnType<RobotVisual['update']> | null;
+    let held: typeof s.objects[number] | null = null;
+    for (const id of sim.robotIds) {
+      const r = sim.rs(id);
+      const h = r.holding ? s.objects.find((o) => o.id === r.holding!.id) ?? null : null;
+      const fr = this.robots.get(id)!.vis.update(r.q, r.gripperOpen, h ? Math.min(h.size[0], h.size[1]) : null, dt);
+      if (id === sel) f = fr;
+      if (h && !held) held = h;
+    }
     this.syncGhost(sim, dt);
     if (this.selectedId !== null || this.selBox?.visible) this.syncSelection();
 
@@ -515,13 +560,16 @@ export class Scene3D {
       }
     });
 
-    // targets
-    const allT = sim.allTargets();
-    const key = JSON.stringify(Object.values(allT).map((t) => [t.name, t.pose]));
-    if (key !== this.targetsKey) { this.targetsKey = key; this.buildTargets(allT); }
+    // targets: every arm's (in its base frame)
+    const key = JSON.stringify(sim.robotIds.map((id) => [id, Object.values(sim.allTargets(id)).map((t) => [t.name, t.pose])]));
+    if (key !== this.targetsKey) {
+      this.targetsKey = key;
+      this.targetGroup.clear();
+      for (const id of sim.robotIds) this.buildTargets(sim.allTargets(id), sim.multi ? sim.baseOf(id) : undefined, sim.multi ? sim.color(id) : undefined, false);
+    }
 
-    // TCP marker + gizmo proxy
-    const tcp = new THREE.Matrix4().fromArray(f.tcp);
+    // TCP marker + gizmo proxy (selected arm, world frame)
+    const tcp = new THREE.Matrix4().fromArray(sim.multi ? mul(sim.baseOf(sel), f!.tcp) : f!.tcp);
     this.tcpMarker.matrixAutoUpdate = false;
     this.tcpMarker.matrix.copy(tcp);
     this.tcpMarker.matrixWorldNeedsUpdate = true;
@@ -536,18 +584,29 @@ export class Scene3D {
   private syncGhost(sim: SimCore, dt: number) {
     const clip = this.ghostClip;
     if (!clip) return;
-    if (!this.ghost || this.ghost.group.userData.arm !== sim.arm.id) {
-      if (this.ghost) { this.scene.remove(this.ghost.group); this.ghost.dispose(); }
-      this.ghost = new RobotVisual(sim.arm, { ghost: true });
-      this.ghost.group.userData.arm = sim.arm.id;
-      this.scene.add(this.ghost.group);
+    const key = (id: string) => `${id}:${sim.armOf(id).id}:${sim.baseOf(id).join(',')}`;
+    for (const id of sim.robotIds) {
+      const g = this.ghosts.get(id);
+      if (g && g.key === key(id)) continue;
+      if (g) { this.scene.remove(g.holder); g.vis.dispose(); }
+      const holder = new THREE.Group();
+      holder.matrixAutoUpdate = false;
+      holder.matrix.fromArray(sim.baseOf(id));
+      const vis = new RobotVisual(sim.armOf(id), { ghost: true });
+      holder.add(vis.group);
+      this.scene.add(holder);
+      this.ghosts.set(id, { vis, holder, key: key(id) });
     }
-    this.ghost.group.visible = true;
     this.ghostT += dt * clip.speed;
     const end = clip.frames[clip.frames.length - 1].t;
     const fr = sampleGhost(clip.frames, this.ghostT);
-    this.ghost.update(fr.q, fr.open, null, dt);
-    if (this.ghostT > end + 0.8) { this.ghostClip = null; this.ghost.group.visible = false; ghostEnded(); }
+    for (const id of sim.robotIds) {
+      const g = this.ghosts.get(id)!;
+      const r = fr.robots?.[id] ?? (id === sim.primary ? fr : null);
+      g.holder.visible = !!r;
+      if (r) g.vis.update(r.q, r.open, null, dt);
+    }
+    if (this.ghostT > end + 0.8) { this.ghostClip = null; for (const g of this.ghosts.values()) g.holder.visible = false; ghostEnded(); }
   }
 
   resetCamera(scene: SceneDef) {
@@ -560,7 +619,8 @@ export class Scene3D {
   dispose() {
     cancelAnimationFrame(this.raf);
     this.offGhost();
-    this.ghost?.dispose();
+    for (const g of this.ghosts.values()) g.vis.dispose();
+    for (const r of this.robots.values()) r.vis.dispose();
     this.editTc?.dispose();
     this.ro.disconnect();
     this.tc.dispose();

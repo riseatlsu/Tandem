@@ -2,6 +2,12 @@ import { DEG, apply, col, dot, invRigid, mul, pos, rotZ, rotX, trans, withPos, t
 import type { ArmDef, ObjState, ObjectDef, SimState } from '../types';
 import { pointInBoxXY, type OBB } from '../collision/shapes';
 
+/** Ids of the robots currently holding object `id`, in robot order. */
+export function holdersOf(s: SimState, id: string): string[] {
+  return Object.keys(s.robots).filter((r) => s.robots[r].holding?.id === id);
+}
+export const isHeld = (s: SimState, id: string) => Object.values(s.robots).some((r) => r.holding?.id === id);
+
 export function objFromDef(d: ObjectDef): ObjState {
   return {
     id: d.id, kind: d.kind, shape: d.shape,
@@ -10,6 +16,7 @@ export function objFromDef(d: ObjectDef): ObjState {
     color: d.color ?? '#3b82f6', graspable: d.graspable ?? true,
     container: d.container ? { ...d.container } : undefined,
     onConveyor: null,
+    ...(d.twoHanded ? { twoHanded: true } : {}),
   };
 }
 
@@ -25,19 +32,24 @@ export function objectCenter(o: ObjState): V3 {
   return apply(o.pose, [0, 0, o.size[2] / 2]);
 }
 
-/** Find a graspable object between the fingers. */
-export function findGraspable(s: SimState, arm: ArmDef, tcp: M4): ObjState | null {
+/** Find a graspable object between the fingers (`tcp` in world). Parts held by other arms can be taken (handover). */
+export function findGraspable(s: SimState, arm: ArmDef, tcp: M4, self?: string): ObjState | null {
   const tcpP = pos(tcp);
   const toolZ = col(tcp, 2);
   const tol = arm.gripper.graspTolerance / 1000;
   let best: ObjState | null = null, bestD = Infinity;
   for (const o of s.objects) {
-    if (!o.graspable || s.holding?.id === o.id || o.toppled) continue;
+    if (!o.graspable || o.toppled) continue;
+    if (self !== undefined && s.robots[self]?.holding?.id === o.id) continue;
     const width = Math.min(o.size[0], o.size[1]);
     if (width > arm.gripper.stroke / 1000 + 1e-6) continue;
     const l = apply(invRigid(o.pose), tcpP);
     const h = o.size[2];
-    if (Math.abs(l[0]) > tol || Math.abs(l[1]) > tol) continue;
+    // two-handed parts, and parts another arm is holding (re-grasp handover), can be gripped anywhere along
+    // their footprint; otherwise only at the center
+    const loose = o.twoHanded || isHeld(s, o.id);
+    const tx = loose ? Math.max(tol, o.size[0] / 2) : tol, ty = loose ? Math.max(tol, o.size[1] / 2) : tol;
+    if (Math.abs(l[0]) > tx || Math.abs(l[1]) > ty) continue;
     if (l[2] < 0.1 * h - 0.002 || l[2] > h + 0.005) continue;
     const up = col(o.pose, 2);
     const align = -dot(toolZ, up); // gripper should point down the object's axis
@@ -59,7 +71,7 @@ export function dropObject(s: SimState, o: ObjState, boxes: OBB[]): void {
     if (top <= bottom + 0.01 && pointInBoxXY(b, c)) support = Math.max(support, top);
   }
   for (const other of s.objects) {
-    if (other.id === o.id || s.holding?.id === other.id) continue;
+    if (other.id === o.id || isHeld(s, other.id)) continue;
     const top = objectTopZ(other);
     const oc = pos(other.pose);
     const half = Math.max(other.size[0], other.size[1]) / 2;

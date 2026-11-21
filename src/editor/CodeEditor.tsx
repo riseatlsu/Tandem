@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as monaco from 'monaco-editor';
 import { ROBOT_API_DTS } from './robotApiDts';
-import { useApp, updateWorkspace } from '../store';
+import { useApp, updateLane, updateWorkspace, type Workspace } from '../store';
 import { logEvent } from '../study/logger';
 
 let configured = false;
@@ -29,19 +29,24 @@ function configure() {
   });
 }
 
-export default function CodeEditor() {
+/** Stable empty value: a store selector must not return a new object on every call. */
+const NO_HIGHLIGHT: { line?: number; blockId?: string } = {};
+const codeOf = (ws: Workspace | undefined, lane?: string) => (lane ? ws?.lanes?.[lane]?.code : ws?.code);
+
+/** JavaScript editor. In multi-arm tasks one is shown per arm (`lane` = robot id). */
+export default function CodeEditor({ lane }: { lane?: string } = {}) {
   const host = useRef<HTMLDivElement>(null);
   const ed = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const deco = useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
   const taskId = useApp((s) => s.taskId);
-  const highlight = useApp((s) => s.highlight);
+  const highlight = useApp((s) => (lane ? s.highlight.lanes?.[lane] ?? NO_HIGHLIGHT : s.highlight));
   const fault = useApp((s) => s.fault);
   const running = useApp((s) => s.runState !== 'idle');
 
   useEffect(() => {
     configure();
-    const code = useApp.getState().workspaces[taskId]?.code ?? '';
-    const model = monaco.editor.createModel(code, 'javascript', monaco.Uri.parse(`file:///program-${taskId}.js`));
+    const code = codeOf(useApp.getState().workspaces[taskId], lane) ?? '';
+    const model = monaco.editor.createModel(code, 'javascript', monaco.Uri.parse(`file:///program-${taskId}${lane ? `-${lane}` : ''}.js`));
     const e = monaco.editor.create(host.current!, {
       model, theme: 'tandem', fontFamily: 'JetBrains Mono, ui-monospace, Menlo, monospace', fontSize: 13, lineHeight: 21,
       minimap: { enabled: false }, scrollBeyondLastLine: false, automaticLayout: true, padding: { top: 12, bottom: 12 },
@@ -54,27 +59,27 @@ export default function CodeEditor() {
     let changes = { added: 0, removed: 0 };
     const sub = model.onDidChangeContent((ev) => {
       for (const c of ev.changes) { changes.added += c.text.length; changes.removed += c.rangeLength; }
-      updateWorkspace({ code: model.getValue() });
+      if (lane) updateLane(lane, { code: model.getValue() }); else updateWorkspace({ code: model.getValue() });
       if (pending) clearTimeout(pending);
       pending = setTimeout(() => {
-        logEvent('code_edit', { ...changes });
+        logEvent('code_edit', { ...changes, ...(lane ? { robot: lane } : {}) });
         changes = { added: 0, removed: 0 };
-        logEvent('program_snapshot', { editor: 'code', code: model.getValue() });
+        logEvent('program_snapshot', { editor: 'code', code: model.getValue(), ...(lane ? { robot: lane } : {}) });
       }, 2000);
     });
     // external updates (accepted agent proposals)
     const unsub = useApp.subscribe((s, prev) => {
-      const nc = s.workspaces[s.taskId]?.code;
-      if (nc !== prev.workspaces[prev.taskId]?.code && nc !== undefined && nc !== model.getValue()) model.pushEditOperations([], [{ range: model.getFullModelRange(), text: nc }], () => null);
+      const nc = codeOf(s.workspaces[s.taskId], lane);
+      if (nc !== codeOf(prev.workspaces[prev.taskId], lane) && nc !== undefined && nc !== model.getValue()) model.pushEditOperations([], [{ range: model.getFullModelRange(), text: nc }], () => null);
     });
     return () => { sub.dispose(); unsub(); e.dispose(); model.dispose(); if (pending) clearTimeout(pending); };
-  }, [taskId]);
+  }, [taskId, lane]);
 
   useEffect(() => { ed.current?.updateOptions({ readOnly: running }); }, [running]);
 
   useEffect(() => {
     const line = highlight.line;
-    const fl = fault?.line;
+    const fl = lane && fault?.robot && fault.robot !== lane ? undefined : fault?.line;
     const decs: monaco.editor.IModelDeltaDecoration[] = [];
     if (line) decs.push({ range: new monaco.Range(line, 1, line, 1), options: { isWholeLine: true, className: 'exec-line', glyphMarginClassName: 'exec-glyph' } });
     if (fl) decs.push({ range: new monaco.Range(fl, 1, fl, 1), options: { isWholeLine: true, className: 'fault-line' } });

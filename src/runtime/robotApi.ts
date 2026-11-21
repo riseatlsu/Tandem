@@ -13,12 +13,15 @@ export type CallFn = (cmd: WireCommand, line?: number) => Promise<unknown>;
 
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as new (...args: string[]) => (...a: unknown[]) => Promise<void>;
 export const SOURCE_URL = 'user-program.js';
-const PARAMS = ['robot', 'gripper', 'io', 'targets', 'offset', 'log', '__hl'];
+/** Each lane of a multi-arm run gets its own source URL, so stack frames tell the lanes apart. */
+export const laneSourceUrl = (lane?: string) => (lane ? `user-program-${lane}.js` : SOURCE_URL);
+const PARAMS = ['robot', 'gripper', 'io', 'targets', 'offset', 'log', '__hl', 'sync'];
 
 let lineOffset: number | null = null;
-function parseLine(stack: string | undefined): number | undefined {
+function parseLine(stack: string | undefined, lane?: string): number | undefined {
   if (!stack) return undefined;
-  const m = stack.match(/user-program\.js:(\d+)(?::\d+)?/);
+  const file = lane ? `user-program-${lane}` : 'user-program(?:-[A-Za-z0-9_]+)?';
+  const m = stack.match(new RegExp(`${file}\\.js:(\\d+)(?::\\d+)?`));
   return m ? Number(m[1]) : undefined;
 }
 /** `new Function` bodies get engine-specific header lines; measure once with the same parameter list. */
@@ -33,15 +36,19 @@ function getOffset(): number {
   }
   return lineOffset;
 }
-export function userLine(stack?: string): number | undefined {
-  const l = parseLine(stack ?? new Error().stack);
+export function userLine(stack?: string, lane?: string): number | undefined {
+  const l = parseLine(stack ?? new Error().stack, lane);
   return l === undefined ? undefined : Math.max(1, l - getOffset());
 }
 
-export function compileProgram(src: string) {
+/** Compile one lane's program. `lane` is set only in multi-arm runs (it changes the source URL). */
+export function compileProgram(src: string, lane?: string) {
   getOffset();
-  return new AsyncFunction(...PARAMS, `${src}\n//# sourceURL=${SOURCE_URL}`);
+  return new AsyncFunction(...PARAMS, `${src}\n//# sourceURL=${laneSourceUrl(lane)}`);
 }
+/** Call a compiled program with an API object from createApi. */
+export const runProgram = (fn: ReturnType<typeof compileProgram>, api: ReturnType<typeof createApi>) =>
+  fn(api.robot, api.gripper, api.io, api.targets, api.offset, api.log, api.__hl, api.sync);
 
 function checkPoseLike(p: unknown, fn: string) {
   if (typeof p === 'string') return;
@@ -50,8 +57,9 @@ function checkPoseLike(p: unknown, fn: string) {
     throw new RobotFault({ code: 'INVALID_ARG', message: `${fn}() needs a target name or a pose {x, y, z, rx, ry, rz}.` });
 }
 
-export function createApi(call: CallFn, targetMap: Record<string, Pose>, log: (args: unknown[], line?: number) => void) {
-  const here = () => userLine(new Error().stack);
+/** The API one lane's program sees. `lane` (multi-arm runs only) selects the lane's source URL for line numbers. */
+export function createApi(call: CallFn, targetMap: Record<string, Pose>, log: (args: unknown[], line?: number) => void, lane?: string) {
+  const here = () => userLine(new Error().stack, lane);
   const c = (cmd: WireCommand) => call(cmd, here());
   const resolve = (p: string | Pose, fn: string): Pose => {
     if (typeof p === 'string') {
@@ -70,6 +78,10 @@ export function createApi(call: CallFn, targetMap: Record<string, Pose>, log: (a
     getPose: () => c({ op: 'query', what: 'pose' }) as Promise<Pose>,
     getJoints: () => c({ op: 'query', what: 'joints' }) as Promise<number[]>,
     wait: (ms: number) => c({ op: 'wait', ms }) as Promise<void>,
+    /** Lead a synced move: every other arm must call robot.follow() at the same sync (SPEC §21.4). */
+    moveTogether: (target: string | Pose, opts?: { speed?: number }) => { checkPoseLike(target, 'moveTogether'); return c({ op: 'sync', kind: 'move', target, speed: opts?.speed }) as Promise<void>; },
+    /** Follow the arm that calls robot.moveTogether() at this sync, keeping the same offset to it. */
+    follow: () => c({ op: 'sync', kind: 'follow' }) as Promise<void>,
   });
   const gripper = Object.freeze({
     open: () => c({ op: 'gripper', action: 'open' }) as Promise<void>,
@@ -92,7 +104,9 @@ export function createApi(call: CallFn, targetMap: Record<string, Pose>, log: (a
   };
   const logFn = (...args: unknown[]) => log(args, here());
   const hl = (blockId: string) => call({ op: 'hl', blockId });
-  return { robot, gripper, io, targets, offset, log: logFn, __hl: hl };
+  /** Wait for each other: resolves once every arm's program has reached its matching sync(). */
+  const sync = () => c({ op: 'sync', kind: 'wait' }) as Promise<void>;
+  return { robot, gripper, io, targets, offset, log: logFn, __hl: hl, sync };
 }
 
 export function formatLogArg(a: unknown): string {

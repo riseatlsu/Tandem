@@ -1,9 +1,10 @@
 /// <reference lib="webworker" />
 /**
- * Executes one user program. Robot calls become postMessage RPCs that the main thread
- * validates and executes on the live SimCore. Created per run; terminated on stop/fault/done.
+ * Executes a run's programs: one lane per robot (one lane in single-arm cells), all started together.
+ * Robot calls become postMessage RPCs that the main thread schedules and executes on the live SimCore.
+ * Created per run; terminated on stop/fault/done.
  */
-import { compileProgram, createApi, formatLogArg, RobotFault, userLine } from './robotApi';
+import { compileProgram, createApi, formatLogArg, RobotFault, runProgram, userLine } from './robotApi';
 import type { MainToWorker, WorkerToMain, WireCommand } from './protocol';
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -24,11 +25,11 @@ try { Object.defineProperty(navigator, 'sendBeacon', { value: undefined }); } ca
 let nextId = 1;
 const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: unknown) => void }>();
 
-const call = (cmd: WireCommand, line?: number) =>
+const callFor = (lane: string) => (cmd: WireCommand, line?: number) =>
   new Promise<unknown>((resolve, reject) => {
     const id = nextId++;
     pending.set(id, { resolve, reject });
-    post({ t: 'call', id, cmd, line });
+    post({ t: 'call', lane, id, cmd, line });
   });
 
 self.onmessage = async (e: MessageEvent<MainToWorker>) => {
@@ -41,15 +42,22 @@ self.onmessage = async (e: MessageEvent<MainToWorker>) => {
     return;
   }
   if (m.t === 'start') {
-    const api = createApi(call, m.targets, (args, line) => post({ t: 'log', args: args.map(formatLogArg), line }));
-    try {
-      const fn = compileProgram(m.src);
-      await fn(api.robot, api.gripper, api.io, api.targets, api.offset, api.log, api.__hl);
-      post({ t: 'done' });
-    } catch (err) {
-      if (err instanceof RobotFault) post({ t: 'error', message: err.message, fault: err.fault, line: err.fault.line });
-      else post({ t: 'error', message: err instanceof Error ? `${err.name}: ${err.message}` : String(err), line: userLine((err as Error)?.stack) });
-    }
+    const multi = m.lanes.length > 1;
+    let failed = false;
+    await Promise.all(m.lanes.map(async ({ robot: lane, src, targets }) => {
+      const key = multi ? lane : undefined;
+      const api = createApi(callFor(lane), targets, (args, line) => post({ t: 'log', lane, args: args.map(formatLogArg), line }), key);
+      try {
+        await runProgram(compileProgram(src, key), api);
+        post({ t: 'laneDone', lane });
+      } catch (err) {
+        if (failed) return;
+        failed = true;
+        if (err instanceof RobotFault) post({ t: 'error', lane, message: err.message, fault: err.fault, line: err.fault.line });
+        else post({ t: 'error', lane, message: err instanceof Error ? `${err.name}: ${err.message}` : String(err), line: userLine((err as Error)?.stack, key) });
+      }
+    }));
+    if (!failed) post({ t: 'done' });
   }
 };
 post({ t: 'ready' });

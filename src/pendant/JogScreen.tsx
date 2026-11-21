@@ -3,6 +3,7 @@ import { useApp, type JogMode } from '../store';
 import { host } from '../simHost';
 import { Icon } from '../ui/icons';
 import { logEvent } from '../study/logger';
+import { ArmPicker } from './ArmPicker';
 
 /**
  * Pendant-style jogging, modelled on a 3-axis joystick pendant:
@@ -21,14 +22,15 @@ const TICK_MS = 40;
 function axesFor(mode: JogMode): (Axis | null)[] {
   const sim = host.sim;
   if (!sim) return [null, null, null];
-  const dof = sim.arm.dof;
-  const scara = sim.arm.kind === 'scara4';
+  const arm = sim.armOf(host.arm());
+  const dof = arm.dof;
+  const scara = arm.kind === 'scara4';
   if (mode === 'axes13' || mode === 'axes46') {
     const base = mode === 'axes13' ? 0 : 3;
     return [0, 1, 2].map((k) => {
       const i = base + k;
       if (i >= dof) return null;
-      return { index: i, label: `J${i + 1}`, unit: sim.jointType(i) === 'P' ? 'mm' : '°', enabled: true };
+      return { index: i, label: `J${i + 1}`, unit: sim.jointType(i, host.arm()) === 'P' ? 'mm' : '°', enabled: true };
     });
   }
   if (mode === 'linear') return ['X', 'Y', 'Z'].map((l, k) => ({ index: k, label: l, unit: 'mm', enabled: true }));
@@ -47,7 +49,7 @@ export function JogScreen() {
   const handGuide = useApp((s) => s.handGuide);
   const hgMode = useApp((s) => s.handGuideMode);
   const running = useApp((s) => s.runState !== 'idle');
-  const armKey = useApp((s) => `${s.taskId}:${s.armOverride}`);
+  const armKey = useApp((s) => `${s.taskId}:${s.armOverride}:${s.arm}`);
   const set = useApp((s) => s.set);
   const [vals, setVals] = useState<{ joints: number[]; tcp: number[]; grip: boolean }>({ joints: [], tcp: [], grip: true });
   const isJoint = jog.mode === 'axes13' || jog.mode === 'axes46';
@@ -60,8 +62,9 @@ export function JogScreen() {
       const now = performance.now();
       if (now - last < 90) return;
       last = now;
-      const p = sim.tcpPose();
-      setVals({ joints: sim.jointsDisplay(), tcp: [p.x, p.y, p.z, p.rx, p.ry, p.rz], grip: sim.s.gripperOpen });
+      const a = host.arm();
+      const p = sim.tcpPose(a);
+      setVals({ joints: sim.jointsDisplay(a), tcp: [p.x, p.y, p.z, p.rx, p.ry, p.rz], grip: sim.rs(a).gripperOpen });
     });
     return () => { off(); };
   }, []);
@@ -140,10 +143,11 @@ export function JogScreen() {
   const readLabels = isJoint ? vals.joints.map((_, i) => `J${i + 1}`) : ['X', 'Y', 'Z', 'Rx', 'Ry', 'Rz'];
   const readVals = isJoint ? vals.joints : vals.tcp;
   const activeLabels = new Set(axes.filter(Boolean).map((a) => a!.label));
-  const limits = host.sim?.arm.limits ?? [];
+  const limits = host.sim?.armOf(host.arm()).limits ?? [];
 
   return (
     <div className="screen-pad jog-screen">
+      <ArmPicker />
       <div className="seg seg-lg" role="tablist" aria-label="Motion mode" data-tour="jog-modes">
         {MODES.map((m) => {
           const empty = axesFor(m.id).every((a) => !a);
@@ -178,7 +182,7 @@ export function JogScreen() {
         {readLabels.map((l, i) => {
           const v = readVals[i] ?? 0;
           const lim = isJoint ? limits[i] : undefined;
-          const P = isJoint && host.sim?.jointType(i) === 'P';
+          const P = isJoint && host.sim?.jointType(i, host.arm()) === 'P';
           const frac = lim ? ((P ? v / 1000 : v * Math.PI / 180) - lim.min) / (lim.max - lim.min) : null;
           return (
             <div key={l} className={`readout ${activeLabels.has(l) ? 'on' : ''}`}>
@@ -196,6 +200,9 @@ export function JogScreen() {
         <button className="btn tile-btn" disabled={running} onClick={() => host.goHome()}><Icon.home width={18} height={18} /> Go home</button>
         <button data-tour="jog-teach" className="btn tile-btn aqua" disabled={running} onClick={() => host.teach()} title="Save the current tool pose as a position"><Icon.target width={18} height={18} /> Teach position</button>
       </div>
+      {host.sim?.multi && (
+        <button className="btn sm ghost center-row" disabled={running} onClick={() => host.teachAll()} title="Save one position name for every arm at its current pose (for moves together)"><Icon.target width={13} height={13} /> Teach all arms</button>
+      )}
       {handGuide && (
         <div className="row center-row">
           <span className="muted small">Drag the handle at the tool in the cell view</span>

@@ -5,7 +5,7 @@ import { host } from '../simHost';
 import { flush, logEvent, startLogging, type LogSink } from './logger';
 import { callFunction, firebaseEnabled, getDb, initFirebase } from '../firebase';
 import { CONFIG } from '../config';
-import { PROMPT_VERSION } from '../agent/prompts/system.v3';
+import { PROMPT_VERSION } from '../agent/prompts/system.v4';
 import type { LogEvent } from './events';
 
 export interface RedeemResult { sessionId: string; experimentId: string; condition: string; orderIndex: number; checkpoint?: string | null; rebound?: boolean }
@@ -28,11 +28,11 @@ export function startDemo(taskId = DEMO_TASKS[0]) {
   host.loadTask(taskId);
 }
 
-/** Local study mode for development/tests without Firebase: TEST-<condition>-<n> codes. */
+/** Local study mode for development/tests without Firebase: TEST-<condition>-<n>[-<experiment id>] codes (default experiment: pilot). */
 function localRedeem(code: string): RedeemResult {
-  const m = code.toUpperCase().match(/^TEST-(SUGGEST|QA|OFF)-(\d+)$/);
+  const m = code.toUpperCase().match(/^TEST-(SUGGEST|QA|OFF)-(\d+)(?:-([A-Z0-9][A-Z0-9-]*))?$/);
   if (!m) throw new Error('Unknown code. (Local mode accepts TEST-SUGGEST-1, TEST-QA-1, TEST-OFF-1.)');
-  return { sessionId: `local-${code.toLowerCase()}`, experimentId: 'pilot', condition: m[1].toLowerCase(), orderIndex: Number(m[2]) - 1, checkpoint: null };
+  return { sessionId: `local-${code.toLowerCase()}`, experimentId: m[3]?.toLowerCase() ?? 'pilot', condition: m[1].toLowerCase(), orderIndex: Number(m[2]) - 1, checkpoint: null };
 }
 
 function firestoreSink(sessionId: string): LogSink {

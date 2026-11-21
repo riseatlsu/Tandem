@@ -1,9 +1,115 @@
 {
-  "id": "kitchen-pour", "title": "Pour a drink", "sceneId": "kitchen-lab", "armId": "gofa-like", "seed": 5,
-  "editor": "code", "passOn": "run",
-  "brief": "Pick up the pitcher and pour until the cup is at least **80% full**, then put the pitcher back down **upright**.\n\nTilting the tool past 90° pours. With the gripper pointing down (`rx: 180`), setting `rx: -70` tilts the pitcher toward −y, so its spout moves about 56 mm toward −y. `cup.above` is already offset for you.",
-  "predicates": [{ "type": "fillAtLeast", "object": "cup1", "frac": 0.8 }, { "type": "spilledAtMost", "frac": 0.25 }, { "type": "upright", "object": "pitcher" }, { "type": "programCompleted" }, { "type": "noFaults" }],
-  "starter": { "code": "await robot.home();\nawait gripper.open();\n// 1. pick up the pitcher (pitcher.grasp)\n// 2. move above the cup (cup.above) and tilt to pour\n// 3. return it upright to where it was\n" },
-  "demo": { "order": 70 },
-  "difficulty": 3
+  "id": "kitchen-pour",
+  "title": "Fix the pour",
+  "sceneId": "kitchen-lab",
+  "armId": "gofa-like",
+  "seed": 5,
+  "editor": "blocks",
+  "passOn": "run",
+  "brief": "This program should pick up the pitcher, pour until the cup is at least **80% full**, and put the pitcher back down **upright**. It has **two bugs**.\n\nTwo positions are ready for you: `pour.start` (the pitcher level, just above the cup) and `pour.tilt` (the same spot, tipped so it pours). Run it, see what goes wrong, and fix the blocks.",
+  "predicates": [
+    {
+      "type": "fillAtLeast",
+      "object": "cup1",
+      "frac": 0.8
+    },
+    {
+      "type": "spilledAtMost",
+      "frac": 0.25
+    },
+    {
+      "type": "upright",
+      "object": "pitcher"
+    },
+    {
+      "type": "programCompleted"
+    },
+    {
+      "type": "noFaults"
+    }
+  ],
+  "starter": {
+    "steps": [
+      {
+        "home": true
+      },
+      {
+        "gripper": "open"
+      },
+      {
+        "move": "pitcher.lift"
+      },
+      {
+        "move": "pitcher.grasp",
+        "mode": "linear"
+      },
+      {
+        "move": "pitcher.lift",
+        "mode": "linear"
+      },
+      {
+        "move": "cup.above"
+      },
+      {
+        "move": "pour.start",
+        "mode": "linear"
+      },
+      {
+        "move": "pour.tilt",
+        "mode": "linear",
+        "speed": 30
+      },
+      {
+        "wait": 0.1
+      },
+      {
+        "move": "pour.start",
+        "mode": "linear",
+        "speed": 30
+      },
+      {
+        "move": "pitcher.lift"
+      },
+      {
+        "move": "pitcher.grasp",
+        "mode": "linear"
+      },
+      {
+        "gripper": "open"
+      },
+      {
+        "move": "pitcher.lift",
+        "mode": "linear"
+      },
+      {
+        "home": true
+      }
+    ]
+  },
+  "demo": {
+    "order": 70
+  },
+  "difficulty": 3,
+  "presetTargets": {
+    "pour.start": {
+      "x": 520,
+      "y": 56,
+      "z": 160,
+      "rx": 180,
+      "ry": 0,
+      "rz": 0
+    },
+    "pour.tilt": {
+      "x": 520,
+      "y": 56,
+      "z": 160,
+      "rx": -70,
+      "ry": 0,
+      "rz": 0
+    }
+  },
+  "hints": [
+    "Does the robot actually carry the pitcher? Look at what happens right after it moves down to pitcher.grasp.",
+    "The cup isn’t full enough. Pouring only happens while the pitcher is tipped: how long does it stay tipped? (Too long spills over.)"
+  ]
 }

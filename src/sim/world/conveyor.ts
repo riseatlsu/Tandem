@@ -1,6 +1,7 @@
 import { DEG, mul, pos, rotZ, trans } from '../math/mat4';
 import { nextRandom } from '../rng';
 import type { ConveyorDef, SimState } from '../types';
+import { isHeld } from './objects';
 
 export function stepConveyors(s: SimState, defs: ConveyorDef[], dt: number) {
   for (const c of defs) {
@@ -10,7 +11,7 @@ export function stepConveyors(s: SimState, defs: ConveyorDef[], dt: number) {
     const dir = [(b[0] - a[0]) / L, (b[1] - a[1]) / L, (b[2] - a[2]) / L];
     const along = (p: number[]) => (p[0] - a[0]) * dir[0] + (p[1] - a[1]) * dir[1] + (p[2] - a[2]) * dir[2];
     const running = s.outputs[c.runOutput] === true;
-    const parts = s.objects.filter((o) => o.onConveyor === c.id && s.holding?.id !== o.id).sort((x, y) => along(pos(y.pose)) - along(pos(x.pose)));
+    const parts = s.objects.filter((o) => o.onConveyor === c.id && !isHeld(s, o.id)).sort((x, y) => along(pos(y.pose)) - along(pos(x.pose)));
     const sizeAlong = c.spawn.size[0] / 1000;
     const gap = 0.01;
     // spawn
@@ -18,7 +19,8 @@ export function stepConveyors(s: SimState, defs: ConveyorDef[], dt: number) {
       const last = parts[parts.length - 1];
       if (!last || along(pos(last.pose)) > sizeAlong + gap) {
         const [r1, ns1] = nextRandom(s.rng); s.rng = ns1;
-        const color = c.spawn.colors[Math.min(c.spawn.colors.length - 1, Math.floor(r1 * c.spawn.colors.length))];
+        // `cycle` takes the colors in order (red, blue, red, …); otherwise they are drawn from the seeded rng
+        const color = c.spawn.cycle ? c.spawn.colors[st.spawned % c.spawn.colors.length] : c.spawn.colors[Math.min(c.spawn.colors.length - 1, Math.floor(r1 * c.spawn.colors.length))];
         const [r2, ns2] = nextRandom(s.rng); s.rng = ns2;
         const yaw = Math.atan2(dir[1], dir[0]) / DEG;
         s.spawnCounter++;

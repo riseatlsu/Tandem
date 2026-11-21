@@ -58,7 +58,7 @@ export function planSummary(plan: Plan | undefined) {
 }
 
 /** Ticks plan steps from live state (throttled; only does work while a plan exists). */
-export function initPlanTracking(host: { onFrame(fn: (sim: { s: { holding: unknown } }) => void): unknown }, program: () => string) {
+export function initPlanTracking(host: { onFrame(fn: (sim: { busy(): boolean; s: { robots: Record<string, { holding: unknown }> } }) => void): unknown }, program: () => string) {
   let last = 0;
   host.onFrame((sim) => {
     const now = performance.now();
@@ -71,7 +71,7 @@ export function initPlanTracking(host: { onFrame(fn: (sim: { s: { holding: unkno
       taughtTargets: Object.values(ws?.targets ?? {}).filter((t) => t.source === 'taught').map((t) => t.name),
       program: program(),
       screen: st.pendantScreen,
-      holding: !!sim.s.holding,
+      holding: Object.values(sim.s.robots).some((r) => !!r.holding),
       lastRunCompleted: st.lastTrace?.outcome === 'completed',
       goals: st.predicates.map((p) => p.pass),
     });

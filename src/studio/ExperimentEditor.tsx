@@ -1,7 +1,7 @@
 /** Studio: build an experiment — conditions, AI mode/model/features, task sequences, counterbalancing, survey link — and issue participant codes. */
 import { useEffect, useState } from 'react';
 import { EXPERIMENTS, ExperimentZ, TASKS, type ExperimentDef } from '../content';
-import { PROMPT_VERSION } from '../agent/prompts/system.v3';
+import { PROMPT_VERSION } from '../agent/prompts/system.v4';
 import { CONFIG } from '../config';
 import { Area, Check, Field, Num, Select, Text, tidy } from './fields';
 import { pretty, saveFile } from './api';

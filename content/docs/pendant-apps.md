@@ -29,5 +29,8 @@ Toggles: Show positions in the cell (draws a small frame at every position), Sou
 ## Run keys and the 3D view
 Run (or Ctrl/Cmd+Enter) starts the program. Pause halts it after the current command; Step then runs one robot command at a time; Resume continues. STOP (or Esc) ends the run. If a move fails a check, the robot stops before moving and the status shows Protective stop. In the 3D cell view: drag to orbit, scroll to zoom, use "Sim speed" to run the simulation faster or slower, "Reset" to put every part back where it started (after a fault the card also offers "Reset scene"), and the camera button to reset the view.
 
+## Two-arm tasks on the pendant
+On tasks with several arms the pendant is wider. The Program app shows a column per arm and a status line (Moving, Waiting for others, Finished). Jog and Positions have arm buttons at the top to pick the arm you jog and teach, and the Positions app adds Teach all arms at once. The I/O app is shared: every arm's program sees the same signals. Settings hides the Robot arm choice, because the cell decides the arms.
+
 ## AI partner window
 The AI partner button in the pendant's status bar opens a floating chat window you can drag anywhere. In the demo you can pick the model at the top of the window. Depending on the mode it can answer questions, show pictures of blocks or short example clips, make a step-by-step plan, and propose program changes that you preview and then Accept or Reject. It never changes your program without your click.

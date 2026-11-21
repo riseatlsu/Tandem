@@ -191,6 +191,7 @@ export function SceneEditor({ sourceId, models, onSaved }: { sourceId: string | 
               <button className="btn sm" onClick={() => { const c = pv.current?.camera(); if (c) up((s) => { s.camera = c; }); }}><Icon.camera width={12} height={12} /> Use the current view</button>
             </Field>
             <p className="st-help">The table marked <b>mount</b> is what the robot stands on (its top is z = 0). Units are millimeters; the robot base is at the origin, X forward, Z up.</p>
+            <RobotsField value={d.robots} onChange={(r) => up((s) => { if (r) s.robots = r; else delete s.robots; })} />
           </>
         )}
 
@@ -313,6 +314,27 @@ export function SceneEditor({ sourceId, models, onSaved }: { sourceId: string | 
         <details className="st-json"><summary>JSON</summary><Area mono rows={14} value={pretty(tidy(d))} onChange={(v) => { try { setD(JSON.parse(v)); } catch { /* keep typing */ } }} /></details>
       </aside>
     </div>
+  );
+}
+
+/** Multi-arm cells (SPEC §21.2): the robots list as JSON. Each arm's targets are in its own base frame. */
+function RobotsField({ value, onChange }: { value: SceneDef['robots']; onChange(v: SceneDef['robots']): void }) {
+  const [text, setText] = useState(() => (value ? JSON.stringify(value, null, 1) : ''));
+  const [err, setErr] = useState<string | null>(null);
+  const commit = (t: string) => {
+    if (!t.trim()) { setErr(null); onChange(undefined); return; }
+    try {
+      const v = JSON.parse(t);
+      const r = SceneZ.shape.robots.safeParse(v);
+      if (!r.success) { setErr(r.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).slice(0, 3).join(' · ')); return; }
+      for (const rb of r.data ?? []) if (!ARMS[rb.armId]) { setErr(`unknown arm ${rb.armId}`); return; }
+      setErr(null); onChange(r.data);
+    } catch (e) { setErr((e as Error).message); }
+  };
+  return (
+    <Field label="Arms (multi-arm cell, optional)" wide hint={err ?? 'Leave empty for a one-arm cell. Otherwise a JSON list: [{ "id": "A", "label": "Left arm", "armId": "gofa-like", "base": { "x": 0, "y": 400, "z": 0, "rz": 0 }, "color": "#1a8cff", "targets": { "pick": { "x": 450, "y": 0, "z": 100, "rx": 180, "ry": 0, "rz": 0 } } }, …]. Targets are measured from each arm’s base; the Positions list below is only used by one-arm cells.'}>
+      <Area mono rows={value ? 10 : 3} value={text} onChange={(t) => { setText(t); commit(t); }} />
+    </Field>
   );
 }
 

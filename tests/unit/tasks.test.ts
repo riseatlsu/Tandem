@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { TASKS, DEMO_TASKS } from '../../src/content';
 import { simFor } from './helpers';
-import { runHeadless } from '../../src/runtime/headless';
+import { runHeadless, splitLanes } from '../../src/runtime/headless';
 import { evaluateAll } from '../../src/sim/predicates/evaluators';
 
-const solution = (id: string) => readFileSync(`tests/fixtures/solutions/${id}.js`, 'utf8');
+const solution = (id: string) => splitLanes(readFileSync(`tests/fixtures/solutions/${id}.js`, 'utf8'));
 
 describe('every task has a passing reference solution', () => {
   it('every task has a solution unless it is passed live', () => {
@@ -29,7 +29,7 @@ describe('every task has a passing reference solution', () => {
     const sim = simFor('tut-jog-teach');
     const ctx = () => ({ scene: sim.scene, targets: sim.allTargets(), programCompleted: false, runStartTime: 0, runFaults: 0, totalLiquid: 0 });
     expect(evaluateAll(t.predicates, sim.s, ctx())[0].pass).toBe(false);
-    sim.setTargets({ P1: { name: 'P1', pose: sim.tcpPose(), q: sim.s.q, source: 'taught' } });
+    sim.setTargets({ P1: { name: 'P1', pose: sim.tcpPose(), q: sim.rs().q, source: 'taught' } });
     expect(evaluateAll(t.predicates, sim.s, ctx())[0].pass).toBe(true);
   });
 });

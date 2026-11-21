@@ -1,0 +1,217 @@
+{
+ "id": "duo-handover",
+ "title": "Handover Station",
+ "environment": "factory",
+ "fixtures": [
+  {
+   "id": "table",
+   "kind": "box",
+   "center": [
+    450,
+    0,
+    -20
+   ],
+   "size": [
+    1500,
+    1900,
+    40
+   ],
+   "color": "#e9eef3",
+   "mount": true
+  },
+  {
+   "id": "infeed_tray",
+   "kind": "box",
+   "center": [
+    500,
+    700,
+    40
+   ],
+   "size": [
+    200,
+    380,
+    80
+   ],
+   "color": "#cfe3f7",
+   "label": "Infeed"
+  },
+  {
+   "id": "outfeed_rack",
+   "kind": "box",
+   "center": [
+    500,
+    -700,
+    40
+   ],
+   "size": [
+    200,
+    380,
+    80
+   ],
+   "color": "#ffe0c4",
+   "label": "Outfeed"
+  }
+ ],
+ "objects": [
+  {
+   "id": "bar",
+   "kind": "bar",
+   "shape": "box",
+   "size": [
+    40,
+    300,
+    40
+   ],
+   "position": [
+    500,
+    700,
+    80
+   ],
+   "color": "green"
+  }
+ ],
+ "regions": [
+  {
+   "id": "outfeed",
+   "center": [
+    500,
+    -700,
+    110
+   ],
+   "size": [
+    220,
+    220,
+    80
+   ],
+   "label": "Outfeed"
+  }
+ ],
+ "io": {
+  "inputs": [],
+  "outputs": []
+ },
+ "conveyors": [],
+ "sceneTargets": {},
+ "robots": [
+  {
+   "id": "A",
+   "label": "Left arm",
+   "armId": "gofa-like",
+   "base": {
+    "x": 0,
+    "y": 400,
+    "z": 0,
+    "rz": 0
+   },
+   "color": "#1a8cff",
+   "targets": {
+    "tray.above": {
+     "x": 500,
+     "y": 300,
+     "z": 250,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "tray": {
+     "x": 500,
+     "y": 300,
+     "z": 100,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "give.above": {
+     "x": 500,
+     "y": -310,
+     "z": 370,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "give": {
+     "x": 500,
+     "y": -310,
+     "z": 250,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "ready": {
+     "x": 450,
+     "y": 0,
+     "z": 300,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    }
+   }
+  },
+  {
+   "id": "B",
+   "label": "Right arm",
+   "armId": "gofa-like",
+   "base": {
+    "x": 0,
+    "y": -400,
+    "z": 0,
+    "rz": 0
+   },
+   "color": "#ff8a2a",
+   "targets": {
+    "take.above": {
+     "x": 500,
+     "y": 350,
+     "z": 370,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "take": {
+     "x": 500,
+     "y": 350,
+     "z": 250,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "rack.above": {
+     "x": 500,
+     "y": -440,
+     "z": 251,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "rack": {
+     "x": 500,
+     "y": -440,
+     "z": 101,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "ready": {
+     "x": 450,
+     "y": 0,
+     "z": 300,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    }
+   }
+  }
+ ],
+ "camera": {
+  "position": [
+   -1250,
+   -150,
+   2650
+  ],
+  "target": [
+   480,
+   0,
+   0
+  ]
+ }
+}

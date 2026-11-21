@@ -1,10 +1,71 @@
 {
-  "id": "factory-bin-three", "title": "Loop: clear three parts", "sceneId": "factory-pick", "armId": "ur-like", "seed": 4,
-  "editor": "code", "passOn": "run",
-  "brief": "Three parts will arrive one after another. Write a **loop** that moves every part into the reject bin.\n\nThis cell uses a different cobot — your targets still work by name.",
-  "predicates": [{ "type": "countInRegion", "kind": "part", "region": "bin", "count": 3, "label": "3 parts in the bin" }, { "type": "programCompleted" }, { "type": "noFaults" }],
-  "conveyorOverrides": { "infeed": { "count": 3, "intervalSec": 4 } },
-  "starter": { "code": "// Move every arriving part into the bin\nawait robot.home();\n\nfor (let i = 0; i < 3; i++) {\n  // your code here\n}\n" },
-  "demo": { "order": 40 },
-  "difficulty": 2
+  "id": "factory-bin-three",
+  "title": "Finish the loop",
+  "sceneId": "factory-pick",
+  "armId": "ur-like",
+  "seed": 4,
+  "editor": "blocks",
+  "passOn": "run",
+  "brief": "Three parts arrive one after another, and every one has to go into the **reject bin**.\n\nThe program is half written: the **Repeat 3 times** loop already waits for a part and moves down to it. Finish the loop where the note says so: **grab** the part, lift it **straight up**, move to `bin.drop` and **let go**.\n\nThis cell uses a different cobot — your positions still work by name.",
+  "predicates": [
+    {
+      "type": "countInRegion",
+      "kind": "part",
+      "region": "bin",
+      "count": 3,
+      "label": "3 parts in the bin"
+    },
+    {
+      "type": "programCompleted"
+    },
+    {
+      "type": "noFaults"
+    }
+  ],
+  "conveyorOverrides": {
+    "infeed": {
+      "count": 3,
+      "intervalSec": 4
+    }
+  },
+  "starter": {
+    "steps": [
+      {
+        "home": true
+      },
+      {
+        "gripper": "open"
+      },
+      {
+        "repeat": 3,
+        "do": [
+          {
+            "waitInput": "part_present",
+            "value": true
+          },
+          {
+            "move": "pick.approach"
+          },
+          {
+            "move": "pick",
+            "mode": "linear"
+          },
+          {
+            "note": "Finish here: grab the part, lift it straight up, drop it in the bin"
+          }
+        ]
+      },
+      {
+        "home": true
+      }
+    ]
+  },
+  "demo": {
+    "order": 40
+  },
+  "difficulty": 2,
+  "hints": [
+    "You need four more blocks inside the loop, in this order: Close gripper, Move to pick.approach (straight line), Move to bin.drop, Open gripper.",
+    "Lift with a straight line, so the part comes up out of the conveyor without dragging sideways."
+  ]
 }

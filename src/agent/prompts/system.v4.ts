@@ -1,12 +1,15 @@
-import { STEP_SCHEMA_DOC } from '../../blocks/steps';
+import { LANES_SCHEMA_DOC, STEP_SCHEMA_DOC } from '../../blocks/steps';
 import type { AgentFeatures } from '../../store';
 
-export const PROMPT_VERSION = 'sys-v3';
+/** v4 = v3 plus a multi-arm section that is appended only on multi-arm tasks (single-arm text is unchanged). */
+export const PROMPT_VERSION = 'sys-v4';
 
 export interface PromptCtx {
   taskTitle: string; taskBrief: string; armName: string; editor: 'blocks' | 'code'; mode: 'qa' | 'suggest';
   targets: string[]; inputs: string[]; outputs: string[];
   features: AgentFeatures;
+  /** Multi-arm tasks only: every arm with its own target names. */
+  arms?: { id: string; label: string; targets: string[] }[];
 }
 
 export function systemPrompt(c: PromptCtx): string {
@@ -37,7 +40,27 @@ Good practice: moveJ to an approach point above, moveL down, act, moveL back up.
 ${c.mode === 'suggest' ? `- You MAY change the program, but only by calling propose_patch. The user previews and accepts or rejects it, and nothing changes without their click. Call dry_run first and fix problems until the dry run completes without faults, then propose. After proposing, briefly say what changed and why. Don't paste the whole program into chat.
 - You cannot press Run, teach targets, or move the robot. If a target is missing, tell the user exactly where to jog and what name to teach.
 ${c.editor === 'blocks' ? `- The user works in BLOCKS. Programs you read and propose are JSON "steps":\n${STEP_SCHEMA_DOC}\n- In propose_patch and dry_run, pass {"steps": [...]} (the whole program, top to bottom). Do not write JavaScript for a blocks user.` : `- The user works in CODE. In propose_patch and dry_run, pass {"program": "<full JavaScript program>"}.`}` : `- You are in Q&A mode: explain, teach and point out bugs, but you cannot change the program. Describe what the user should change (which block or line), and include short snippets if useful.`}
-- Encourage learning: explain the why in one line (e.g. why a straight-line approach avoids collisions).${visualSection(c)}`;
+- Encourage learning: explain the why in one line (e.g. why a straight-line approach avoids collisions).${visualSection(c)}${multiArmSection(c)}`;
+}
+
+function multiArmSection(c: PromptCtx): string {
+  if (!c.arms) return '';
+  return `
+
+## Multi-arm task (this task has ${c.arms.length} arms)
+${c.arms.map((a) => `- Arm ${a.id} = "${a.label}". Its targets (in its own base frame): ${a.targets.join(', ') || '(none yet)'}`).join('\n')}
+- Each arm runs its own program; all start together when the user presses Run. The "Targets available" line above is only arm ${c.arms[0].id}'s list.
+- Coordination: sync() = "Wait for each other" (every arm waits until all arrive). robot.moveTogether(target) on one arm + robot.follow() on every other arm at the same sync = "Move together": the leader moves in a straight line, the others keep their distance to it, so a part held by several arms moves with them. The k-th sync of each program pairs with the k-th of every other; syncs never go inside loops or ifs.
+- Arm faults: ARM_COLLISION (two arms would hit: add a "Wait for each other" so one moves away first, or change a position), SHARED_GRASP (both arms hold a part and one moves alone: use Move together or open one gripper), NEEDS_TWO_HANDS (a two-handed part needs both grippers and Move together), SYNC_MISMATCH (programs' sync blocks don't line up).
+- A handover is a re-grasp: arm A holds the part, arm B closes its gripper on it, then A opens.
+- Use only the inputs and outputs listed above; this cell may have none (then there is nothing to wait for — coordinate the arms with sync steps instead). The conveyor advice above only applies to cells with part_present.
+- When the user asks for a program: build it, dry_run it, fix whatever the dry run reports and dry_run again until it passes, then call propose_patch. Never describe the program in chat instead of proposing it.
+${c.mode === 'suggest' ? (c.editor === 'blocks'
+    ? `- In propose_patch, dry_run and show_blocks pass {"lanes": {...}} instead of {"steps": [...]}, with every arm's complete lane.
+${LANES_SCHEMA_DOC}`
+    : '- In propose_patch and dry_run pass {"programs": {"A": "<full JavaScript>", "B": "<full JavaScript>"}} instead of {"program": ...}, one complete program per arm.')
+    : `- Programs you read come per arm (read_program returns ${c.editor === 'blocks' ? '"lanes"' : '"programs"'}).${c.editor === 'blocks' ? `
+${LANES_SCHEMA_DOC}` : ''}`}`;
 }
 
 function visualSection(c: PromptCtx): string {

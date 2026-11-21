@@ -1,0 +1,39 @@
+{
+ "id": "duo-handover",
+ "title": "Handover",
+ "sceneId": "duo-handover",
+ "seed": 1,
+ "editor": "blocks",
+ "passOn": "run",
+ "brief": "Only the **left arm** reaches the infeed, and only the **right arm** reaches the outfeed. Pass the green bar between them in mid-air.\n\nLeft arm: pick the bar and hold it at `give`. Right arm: close its gripper on the other end at `take`. Then the left arm lets go, and the right arm puts the bar on the outfeed.\n\nA bar held by two grippers can\u2019t be moved by one arm alone, so the arms have to take turns. Use **Wait for each other** at each hand-off.",
+ "predicates": [
+  {
+   "type": "handedOver",
+   "object": "bar",
+   "from": "A",
+   "to": "B",
+   "label": "Bar handed from the left to the right arm"
+  },
+  {
+   "type": "objectInRegion",
+   "object": "bar",
+   "region": "outfeed",
+   "label": "Bar on the outfeed"
+  },
+  {
+   "type": "noArmCollisions"
+  },
+  {
+   "type": "programCompleted"
+  }
+ ],
+ "hints": [
+  "Three hand-offs need three \u201cWait for each other\u201d: the bar is at `give`; the right arm has closed on it; the left arm has let go.",
+  "If the right arm moves while both grippers still hold the bar, you get SHARED_GRASP. Let the left arm open first."
+ ],
+ "timeLimitSec": 1500,
+ "demo": {
+  "order": 100
+ },
+ "difficulty": 3
+}

@@ -169,7 +169,8 @@ export function ChatPanel({ dragProps, onCollapse }: { dragProps: DragProps; onC
               </div>
             );
           })}
-          {busy && !msgs.some((m) => m.role === 'tool' && m.tool?.status === 'running') && msgs[msgs.length - 1]?.role === 'user' && <div className="tool-pill"><span className="spin" /> Thinking</div>}
+          {/* the model also thinks between tool calls: keep showing it until text streams in */}
+          {busy && !msgs.some((m) => m.role === 'tool' && m.tool?.status === 'running') && msgs[msgs.length - 1]?.role !== 'assistant' && <div className="tool-pill"><span className="spin" /> Thinking</div>}
         </div>
         <div className="chat-input">
           <div className="box">

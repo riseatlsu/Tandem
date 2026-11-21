@@ -1,0 +1,247 @@
+{
+ "id": "duo-bench",
+ "title": "Two-Arm Bench",
+ "environment": "factory",
+ "fixtures": [
+  {
+   "id": "table",
+   "kind": "box",
+   "center": [
+    450,
+    0,
+    -20
+   ],
+   "size": [
+    1500,
+    1900,
+    40
+   ],
+   "color": "#e9eef3",
+   "mount": true
+  },
+  {
+   "id": "pad_middle",
+   "kind": "box",
+   "center": [
+    450,
+    0,
+    5
+   ],
+   "size": [
+    140,
+    140,
+    10
+   ],
+   "color": "#cfd8e3",
+   "label": "Middle pad"
+  },
+  {
+   "id": "pad_right",
+   "kind": "box",
+   "center": [
+    450,
+    -300,
+    5
+   ],
+   "size": [
+    140,
+    140,
+    10
+   ],
+   "color": "#ffd7b5",
+   "label": "Right pad"
+  }
+ ],
+ "objects": [
+  {
+   "id": "block",
+   "kind": "block",
+   "shape": "box",
+   "size": [
+    40,
+    40,
+    40
+   ],
+   "position": [
+    450,
+    300,
+    0
+   ],
+   "color": "blue"
+  }
+ ],
+ "regions": [
+  {
+   "id": "middle",
+   "center": [
+    450,
+    0,
+    30
+   ],
+   "size": [
+    140,
+    140,
+    60
+   ],
+   "label": "Middle pad"
+  },
+  {
+   "id": "right",
+   "center": [
+    450,
+    -300,
+    30
+   ],
+   "size": [
+    140,
+    140,
+    60
+   ],
+   "label": "Right pad"
+  }
+ ],
+ "io": {
+  "inputs": [],
+  "outputs": []
+ },
+ "conveyors": [],
+ "sceneTargets": {},
+ "robots": [
+  {
+   "id": "A",
+   "label": "Left arm",
+   "armId": "gofa-like",
+   "base": {
+    "x": 0,
+    "y": 400,
+    "z": 0,
+    "rz": 0
+   },
+   "color": "#1a8cff",
+   "targets": {
+    "block.above": {
+     "x": 450,
+     "y": -100,
+     "z": 150,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "block": {
+     "x": 450,
+     "y": -100,
+     "z": 20,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "middle.above": {
+     "x": 450,
+     "y": -400,
+     "z": 161,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "middle": {
+     "x": 450,
+     "y": -400,
+     "z": 31,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "ready": {
+     "x": 450,
+     "y": 0,
+     "z": 300,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "ready.low": {
+     "x": 450,
+     "y": 0,
+     "z": 200,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    }
+   }
+  },
+  {
+   "id": "B",
+   "label": "Right arm",
+   "armId": "gofa-like",
+   "base": {
+    "x": 0,
+    "y": -400,
+    "z": 0,
+    "rz": 0
+   },
+   "color": "#ff8a2a",
+   "targets": {
+    "middle.above": {
+     "x": 450,
+     "y": 400,
+     "z": 161,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "middle": {
+     "x": 450,
+     "y": 400,
+     "z": 31,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "right.above": {
+     "x": 450,
+     "y": 100,
+     "z": 161,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "right": {
+     "x": 450,
+     "y": 100,
+     "z": 31,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "ready": {
+     "x": 450,
+     "y": 0,
+     "z": 300,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "ready.low": {
+     "x": 450,
+     "y": 0,
+     "z": 200,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    }
+   }
+  }
+ ],
+ "camera": {
+  "position": [
+   -1250,
+   -150,
+   2650
+  ],
+  "target": [
+   480,
+   0,
+   0
+  ]
+ }
+}

@@ -2,7 +2,14 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { app, clearStorage, finishTour, localLogs, openAgent, pendant, resetMock, runAndWait, setBlocks } from './helpers';
 
-const POUR = readFileSync('tests/fixtures/solutions/kitchen-pour.js', 'utf8');
+// Task 3 ("Fix the pour") starts with a buggy block program; this is it with both bugs fixed.
+const STARTER = JSON.parse(readFileSync('content/tasks/kitchen-pour.json', 'utf8')).starter.steps as Record<string, unknown>[];
+const POUR_FIXED = (() => {
+  const s = structuredClone(STARTER);
+  s.splice(4, 0, { gripper: 'close' });
+  (s.find((x) => 'wait' in x) as { wait: number }).wait = 0.5;
+  return s;
+})();
 
 test('study happy path: teach → fault → AI fix → pour → resume → finish, fully logged', async ({ page }) => {
   test.setTimeout(240_000); // longest flow: three tasks, several sim runs and a reload
@@ -52,13 +59,18 @@ test('study happy path: teach → fault → AI fix → pour → resume → finis
   await expect(page.getByText('TASK COMPLETE')).toBeVisible();
   await page.getByRole('button', { name: /Next task/ }).click();
 
-  // ---- Task 3: code; reload mid-task resumes with program intact
+  // ---- Task 3: fix a buggy block program; reload mid-task resumes with the program intact
   await expect(page.getByText('Task 3 of 3')).toBeVisible();
-  await app(page, `T.updateWorkspace({ code: ${JSON.stringify(POUR)} }); return null;`);
+  await pendant(page, 'Program');
+  const blocksJson = () => app<string>(page, `return JSON.stringify(T.useApp.getState().workspaces[T.useApp.getState().taskId].blocks ?? null);`);
+  await expect.poll(blocksJson, { timeout: 20_000 }).toContain('pour.tilt'); // the starter is loaded…
+  expect(await blocksJson()).not.toContain('gripper_close'); // …with its bug
+  await setBlocks(page, POUR_FIXED);
+  await expect.poll(blocksJson, { timeout: 20_000 }).toContain('gripper_close');
   await page.waitForTimeout(3600); // checkpoint interval
   await page.reload();
   await expect(page.getByText('Task 3 of 3')).toBeVisible();
-  expect(await app<string>(page, `return T.useApp.getState().workspaces[T.useApp.getState().taskId].code;`)).toBe(POUR);
+  expect(await blocksJson()).toContain('gripper_close');
   await runAndWait(page);
   await expect(page.getByText('TASK COMPLETE')).toBeVisible();
   await page.getByRole('button', { name: /Finish/ }).click();

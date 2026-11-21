@@ -53,8 +53,9 @@ export async function finishTour(page: Page, { expectRequired = false } = {}) {
   for (let i = 0; i < 30 && (await card.count()); i++) {
     const next = card.locator('.tour-foot .btn.aqua');
     if (await next.isDisabled()) {
-      const b = (await page.locator('.tour-spot').boundingBox())!;
-      await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+      // click the step's own target (the spotlight can lag a step behind when rendering is slow)
+      const target = await page.locator('.tour-spot').getAttribute('data-target');
+      await page.locator(`[data-tour="${target}"]`).click();
     } else await next.click();
     await page.waitForTimeout(250);
   }

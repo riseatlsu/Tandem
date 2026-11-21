@@ -18,6 +18,9 @@ export const CLIPS: Clip[] = [
   { id: 'pendant-apps', title: 'Getting around the pendant', about: 'The Home screen has an app grid (Program, Jog, Positions, I/O, Log, Settings); tap a tile to open it, "Home" at the top left goes back, and the dock switches between the main apps.' },
   { id: 'io-signals', title: 'The I/O app', about: 'Open I/O from Home and run a conveyor pick: the part_present input LED turns ON when a part reaches the sensor, the program switches the conveyor_run output OFF while it picks, then ON again. Signals are read-only on this screen; programs change outputs.' },
   { id: 'positions-goto', title: 'Using the Positions app', about: 'The Positions app lists your taught positions and the cell\'s read-only ones; press Go to and the arm moves there, then teach a new position.' },
+  { id: 'sync-wait', title: 'Wait for each other', about: 'Multi-arm: each arm has a column of blocks; a "Wait for each other" copy sits on the same row in every column. During the run the right arm waits (its block glows, status says Waiting for others) until the left arm has put the block down and left.' },
+  { id: 'move-together', title: 'Moving together', about: 'Multi-arm: both arms close their grippers on the wide propeller, wait for each other, then "Move together" (left arm leads, right arm follows) lifts and carries it as one.' },
+  { id: 'teach-all-arms', title: 'Teaching positions for two arms', about: 'Multi-arm: pick the arm at the top of Jog/Positions, jog it, and "Teach all arms at once" saves one position name for every arm at its current pose.' },
   { id: 'ai-suggestion', title: 'Accepting an AI suggestion', about: 'The AI partner tests a change in a hidden copy of the cell, then shows a card: Preview, Show me, Accept or Reject.' },
 ];
 

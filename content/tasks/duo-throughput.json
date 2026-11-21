@@ -1,0 +1,43 @@
+{
+ "id": "duo-throughput",
+ "title": "Two at the conveyor",
+ "sceneId": "duo-conveyor",
+ "seed": 2,
+ "editor": "blocks",
+ "passOn": "run",
+ "brief": "Six parts arrive one after another: red, blue, red, blue\u2026 Both arms can reach the end of the conveyor.\n\nThe **left arm** puts the **red** parts in the left bin; the **right arm** puts the **blue** parts in the right bin. Each arm repeats: wait until `part_color` is its color, pick, drop in its bin, and go back to `ready` out of the other arm\u2019s way.\n\nBoth arms work at the same time, so mind the shared pick spot.",
+ "predicates": [
+  {
+   "type": "countInRegion",
+   "kind": "part",
+   "region": "left_bin",
+   "count": 3,
+   "color": "red",
+   "label": "3 red parts in the left bin"
+  },
+  {
+   "type": "countInRegion",
+   "kind": "part",
+   "region": "right_bin",
+   "count": 3,
+   "color": "blue",
+   "label": "3 blue parts in the right bin"
+  },
+  {
+   "type": "noArmCollisions"
+  },
+  {
+   "type": "programCompleted"
+  }
+ ],
+ "hints": [
+  "Use a Repeat 3 loop in each arm\u2019s program. You don\u2019t need \u201cWait for each other\u201d here: the colors decide whose turn it is.",
+  "Send each arm back to `ready` right after it drops a part, so the pick spot is free for the other arm."
+ ],
+ "maxSimTimeSec": 300,
+ "timeLimitSec": 1500,
+ "demo": {
+  "order": 110
+ },
+ "difficulty": 3
+}

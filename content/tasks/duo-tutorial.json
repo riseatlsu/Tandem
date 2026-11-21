@@ -1,0 +1,36 @@
+{
+ "id": "duo-tutorial",
+ "title": "Two hands",
+ "sceneId": "duo-bench",
+ "seed": 1,
+ "editor": "blocks",
+ "passOn": "run",
+ "brief": "Two arms, one program each. Both start together when you press **Run**.\n\n1. **Left arm**: carry the blue block to the **middle pad**, then get out of the way.\n2. **Right arm**: move the block from the middle pad to the **right pad**. Use **Wait for each other** (in *Together*) so it only reaches in after the left arm has left.\n3. Finish with both arms at `ready`, then one **Move together** to `ready.low`: the left arm leads, the right arm follows.",
+ "predicates": [
+  {
+   "type": "objectInRegion",
+   "object": "block",
+   "region": "right",
+   "label": "Block on the right pad"
+  },
+  {
+   "type": "noArmCollisions"
+  },
+  {
+   "type": "programCompleted"
+  },
+  {
+   "type": "noFaults"
+  }
+ ],
+ "hints": [
+  "Each arm has its own positions: the left arm\u2019s `middle` and the right arm\u2019s `middle` are the same spot, seen from each arm.",
+  "Put a \u201cWait for each other\u201d in both programs: after the left arm leaves the pad, and before the right arm reaches for it.",
+  "Drop \u201cMove together\u201d into the left arm\u2019s program; the right arm gets a matching \u201cFollow\u201d on the same row."
+ ],
+ "timeLimitSec": 1200,
+ "demo": {
+  "order": 90
+ },
+ "difficulty": 2
+}

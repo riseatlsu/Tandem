@@ -6,7 +6,9 @@ export type LogEventType =
   | 'run_start' | 'run_pause' | 'run_resume' | 'run_step' | 'run_stop' | 'run_fault' | 'run_end' | 'scene_reset'
   | 'agent_user_msg' | 'agent_model_msg' | 'agent_tool_call' | 'agent_proposal' | 'agent_proposal_decision' | 'agent_error'
   | 'agent_visual' | 'agent_plan' | 'plan_step_done' | 'preview_play' | 'tour_start' | 'tour_step' | 'tour_end'
-  | 'focus' | 'blur' | 'panel_toggle' | 'camera_move' | 'idle_start' | 'idle_end' | 'help_open' | 'speed_change' | 'arm_change';
+  | 'focus' | 'blur' | 'panel_toggle' | 'camera_move' | 'idle_start' | 'idle_end' | 'help_open' | 'speed_change' | 'arm_change'
+  // multi-arm tasks (SPEC §21.8); arm-related events above also carry `robot` there
+  | 'sync_block_add' | 'sync_block_remove' | 'lane_focus' | 'teach_all';
 
 export interface LogEvent {
   seq: number;

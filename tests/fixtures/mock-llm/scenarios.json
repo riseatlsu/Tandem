@@ -170,6 +170,36 @@
       ]
     },
     {
+      "name": "multi-arm-handover",
+      "match": "hand (it|the bar) over|handover",
+      "steps": [
+        {
+          "tool": "read_task",
+          "args": {}
+        },
+        {
+          "tool": "dry_run",
+          "args": {
+            "lanes": "$HANDOVER_LANES"
+          }
+        },
+        {
+          "tool": "propose_patch",
+          "args": {
+            "lanes": "$HANDOVER_LANES",
+            "explanation": "The left arm brings the bar to `give`; three Wait for each other blocks pass it over: bar in place, right gripper closed, left gripper open."
+          }
+        },
+        {
+          "tool": "preview_proposal",
+          "args": {}
+        },
+        {
+          "text": "Watch both **ghost arms** pass the bar over, then accept if it looks right."
+        }
+      ]
+    },
+    {
       "name": "default",
       "match": ".*",
       "steps": [
@@ -239,6 +269,101 @@
         "move": "pick.approach",
         "mode": "linear"
       }
-    ]
+    ],
+    "HANDOVER_LANES": {
+      "A": [
+        {
+          "gripper": "open"
+        },
+        {
+          "move": "tray.above"
+        },
+        {
+          "move": "tray",
+          "mode": "linear"
+        },
+        {
+          "gripper": "close"
+        },
+        {
+          "move": "tray.above",
+          "mode": "linear"
+        },
+        {
+          "move": "give.above"
+        },
+        {
+          "move": "give",
+          "mode": "linear"
+        },
+        {
+          "sync": "wait"
+        },
+        {
+          "sync": "wait"
+        },
+        {
+          "gripper": "open"
+        },
+        {
+          "sync": "wait"
+        },
+        {
+          "move": "give.above",
+          "mode": "linear"
+        },
+        {
+          "move": "ready"
+        }
+      ],
+      "B": [
+        {
+          "gripper": "open"
+        },
+        {
+          "move": "ready"
+        },
+        {
+          "sync": "wait"
+        },
+        {
+          "move": "take.above"
+        },
+        {
+          "move": "take",
+          "mode": "linear"
+        },
+        {
+          "gripper": "close"
+        },
+        {
+          "sync": "wait"
+        },
+        {
+          "sync": "wait"
+        },
+        {
+          "move": "take.above",
+          "mode": "linear"
+        },
+        {
+          "move": "rack.above"
+        },
+        {
+          "move": "rack",
+          "mode": "linear"
+        },
+        {
+          "gripper": "open"
+        },
+        {
+          "move": "rack.above",
+          "mode": "linear"
+        },
+        {
+          "move": "ready"
+        }
+      ]
+    }
   }
 }

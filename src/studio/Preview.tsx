@@ -2,6 +2,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Scene3D } from '../view/Scene3D';
 import { SimCore } from '../sim/SimCore';
+import { robotsFor } from '../content';
+import { splitLanes } from '../runtime/headless';
 import type { ArmDef, PredicateDef, SceneDef, Target } from '../sim/types';
 import { runHeadless } from '../runtime/headless';
 import type { RunTrace } from '../runtime/protocol';
@@ -49,7 +51,8 @@ export const Preview = forwardRef<PreviewHandle, Props>(function Preview({ scene
     playing.current++;
     if (!scene || !arm) { sim.current = null; return; }
     try {
-      const s = new SimCore(structuredClone(scene), arm, { seed });
+      const sc = structuredClone(scene);
+      const s = new SimCore(sc, robotsFor(sc, arm.id), { seed });
       if (targets) s.setTargets(targets);
       sim.current = s;
       s3.current?.invalidate();
@@ -63,14 +66,15 @@ export const Preview = forwardRef<PreviewHandle, Props>(function Preview({ scene
     async play(src, predicates, sd, speed = 1.5) {
       if (!scene || !arm) return null;
       const token = ++playing.current;
-      const run = new SimCore(structuredClone(scene), arm, { seed: sd });
+      const sc = structuredClone(scene);
+      const run = new SimCore(sc, robotsFor(sc, arm.id), { seed: sd });
       if (targets) run.setTargets(targets);
       sim.current = run;
       const wall = performance.now();
       let lastYield = wall;
       const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
       try {
-        const trace = await runHeadless(run, src, {
+        const trace = await runHeadless(run, splitLanes(src), {
           predicates, seed: sd, maxSimTimeSec: 600,
           onStep: async (sm) => {
             while (token === playing.current && sm.simTime > ((performance.now() - wall) / 1000) * speed) { await frame(); lastYield = performance.now(); }
@@ -82,7 +86,7 @@ export const Preview = forwardRef<PreviewHandle, Props>(function Preview({ scene
       } catch { return null; }
     },
     stop() { playing.current++; },
-    setJoints(q) { if (sim.current) sim.current.s.q = q.slice(); },
+    setJoints(q) { if (sim.current) sim.current.rs().q = q.slice(); },
     camera() {
       const v = s3.current; if (!v) return null;
       const r = (x: number) => Math.round(x * 1000);

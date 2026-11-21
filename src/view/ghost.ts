@@ -21,5 +21,7 @@ export function sampleGhost(frames: GhostFrame[], t: number): GhostFrame {
   while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (frames[mid].t <= t) lo = mid; else hi = mid; }
   const a = frames[lo], b = frames[hi];
   const k = (t - a.t) / Math.max(1e-9, b.t - a.t);
-  return { t, q: a.q.map((v, i) => v + (b.q[i] - v) * k), open: k < 0.5 ? a.open : b.open };
+  const lerp = (x: { q: number[]; open: boolean }, y: { q: number[]; open: boolean }) => ({ q: x.q.map((v, i) => v + (y.q[i] - v) * k), open: k < 0.5 ? x.open : y.open });
+  const robots = a.robots && b.robots ? Object.fromEntries(Object.keys(a.robots).map((id) => [id, lerp(a.robots![id], b.robots![id] ?? a.robots![id])])) : undefined;
+  return { t, ...lerp(a, b), ...(robots ? { robots } : {}) };
 }

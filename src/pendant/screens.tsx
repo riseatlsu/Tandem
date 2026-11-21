@@ -1,6 +1,7 @@
 import { startTour } from '../tour/Tour';
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
-import { useApp, updateWorkspace, type PendantScreen } from '../store';
+import { laneTargets, useApp, updateWorkspace, type PendantScreen } from '../store';
+import { ArmPicker } from './ArmPicker';
 import { ARMS, TASKS } from '../content';
 import { host } from '../simHost';
 import { Icon } from '../ui/icons';
@@ -44,6 +45,7 @@ export function HomeScreen() {
         <span className="task-card-text">
           <span className="eyebrow">Current task</span>
           <span className="t">{task?.title}</span>
+          {host.sim?.multi && <span className="muted small">{host.sim.robotIds.length} arms working together</span>}
           <span className="muted small">{done === preds.length && preds.length ? 'All goals met' : 'Tap to read the brief and goals'}</span>
         </span>
         <Icon.chevron width={16} height={16} className="chev" />
@@ -106,8 +108,10 @@ export function ProgramScreen() {
   const onCode = useCallback((c: string) => setJs(c), []);
   if (!ws) return null;
   const blocks = ws.editor === 'blocks';
+  const lanes = host.sim?.multi ? host.sim.robotIds : null;
   return (
     <div className="program-screen">
+      {lanes && <LaneStatus />}
       {blocks && (
         <div className="program-bar">
           <div className="seg" aria-label="Program view">
@@ -115,7 +119,7 @@ export function ProgramScreen() {
             <button className={view === 'js' ? 'on' : ''} onClick={() => { setView('js'); logEvent('editor_preview_toggle', { on: true }); }}><Icon.code width={12} height={12} /> JavaScript</button>
           </div>
           <span className="grow" />
-          <span className="muted small">{view === 'blocks' ? 'Drag blocks under “When Run is pressed”' : 'Read-only — generated from your blocks'}</span>
+          <span className="muted small">{view === 'blocks' ? (lanes ? 'One column per arm · “Together” blocks appear on every arm, on the same row' : 'Drag blocks under “When Run is pressed”') : 'Read-only — generated from your blocks'}</span>
         </div>
       )}
       <div className="program-body">
@@ -123,8 +127,38 @@ export function ProgramScreen() {
         {blocks && view === 'js' && (
           <pre className="js-preview layer" aria-label="Generated JavaScript (read-only)">{js.replace(/await __hl\('[^']*'\);\n/g, '').replace(/^\s*\n/gm, '') || '// add blocks under “When Run is pressed”'}</pre>
         )}
-        {!blocks && <ErrorBoundary label="code editor" key={ws.editor}><Suspense fallback={<div className="muted" style={{ padding: 16 }}>Loading editor…</div>}><CodeEditor /></Suspense></ErrorBoundary>}
+        {!blocks && !lanes && <ErrorBoundary label="code editor" key={ws.editor}><Suspense fallback={<div className="muted" style={{ padding: 16 }}>Loading editor…</div>}><CodeEditor /></Suspense></ErrorBoundary>}
+        {!blocks && lanes && (
+          <ErrorBoundary label="code editor" key={ws.editor}>
+            <div className="code-lanes">
+              {lanes.map((r) => (
+                <div key={r} className="code-lane">
+                  <div className="code-lane-head"><span className="arm-dot" style={{ background: host.sim.color(r) ?? '#1a8cff' }} />{host.sim.label(r)}</div>
+                  <Suspense fallback={<div className="muted" style={{ padding: 16 }}>Loading editor…</div>}><CodeEditor lane={r} /></Suspense>
+                </div>
+              ))}
+            </div>
+          </ErrorBoundary>
+        )}
       </div>
+    </div>
+  );
+}
+
+/** Multi-arm: what each arm's program is doing during a run (SPEC §21.5 highlighting). */
+function LaneStatus() {
+  const states = useApp((s) => s.laneStates);
+  const running = useApp((s) => s.runState !== 'idle');
+  const sim = host.sim;
+  if (!sim) return null;
+  const text = (st?: string) => (!running ? 'Ready' : st === 'parked' ? 'Waiting for others' : st === 'done' ? 'Finished' : st === 'executing' ? 'Moving' : 'Running');
+  return (
+    <div className="lane-status" aria-label="Arm status">
+      {sim.robotIds.map((r) => (
+        <span key={r} className={`chip ${states[r] === 'parked' ? 'amber' : states[r] === 'done' ? 'leaf' : ''}`}>
+          <span className="arm-dot" style={{ background: sim.color(r) ?? '#1a8cff' }} />{sim.label(r)}: {text(states[r])}
+        </span>
+      ))}
     </div>
   );
 }
@@ -133,10 +167,13 @@ export function ProgramScreen() {
 export function PositionsScreen() {
   const ws = useApp((s) => s.workspaces[s.taskId]);
   const running = useApp((s) => s.runState !== 'idle');
+  useApp((s) => s.arm);
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   if (!ws || !host.sim) return null;
-  const all: Target[] = Object.values({ ...host.sim.allTargets(), ...ws.targets });
+  const arm = host.arm();
+  const multi = host.sim.multi;
+  const all: Target[] = Object.values({ ...host.sim.allTargets(arm), ...laneTargets(ws, arm) });
   const mine = all.filter((t) => t.source !== 'scene');
   const scene = all.filter((t) => t.source === 'scene');
   const commit = (from: string) => { if (draft && draft !== from) host.renameTarget(from, draft); setEditing(null); };
@@ -163,10 +200,12 @@ export function PositionsScreen() {
   );
   return (
     <div className="screen-pad stack">
-      <button className="btn aqua lg" disabled={running} onClick={() => host.teach()}><Icon.plus width={15} height={15} /> Teach new position here</button>
-      <div className="group-label">Your positions</div>
+      <ArmPicker />
+      <button className="btn aqua lg" disabled={running} onClick={() => host.teach()}><Icon.plus width={15} height={15} /> Teach new position here{multi ? ` (${host.sim.label(arm)})` : ''}</button>
+      {multi && <button className="btn" disabled={running} onClick={() => host.teachAll()} title="One name, saved for every arm at its current pose — use it with Move together"><Icon.target width={14} height={14} /> Teach all arms at once</button>}
+      <div className="group-label">{multi ? `${host.sim.label(arm)}’s positions` : 'Your positions'}</div>
       <div className="target-list">
-        {mine.length === 0 && <div className="empty-note">Jog or hand-guide the arm, then teach a position. Programs move between positions.</div>}
+        {mine.length === 0 && <div className="empty-note">Jog or hand-guide the arm, then teach a position. Programs move between positions.{multi ? ' Each arm has its own positions, measured from its own base.' : ''}</div>}
         {mine.map((t) => <Row key={t.name} t={t} />)}
       </div>
       {scene.length > 0 && <>
@@ -255,14 +294,14 @@ export function SettingsScreen() {
       </div>
       {mode === 'demo' && (
         <div className="settings-group">
-          <div className="setting">
+          {!host.sim?.multi && <div className="setting">
             <span><b>Robot arm</b><small>Try the task with a different arm</small></span>
             <select className="field" value={armOverride ?? ''} aria-label="Choose arm" disabled={running}
               onChange={(e) => { host.setArm(e.target.value || null); logEvent('arm_change', { arm: e.target.value }); }}>
               <option value="">Task default ({ARMS[task?.armId ?? '']?.name.split(' (')[0]})</option>
               {Object.values(ARMS).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
-          </div>
+          </div>}
           <div className="setting">
             <span><b>Programming style</b><small>Blocks for beginners, JavaScript for full control</small></span>
             <div className="seg">
@@ -274,7 +313,7 @@ export function SettingsScreen() {
       )}
       <div className="settings-group about">
         <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" />
-        <span><b>Tandem</b><small>{host.sim ? ARMS[host.armId()]?.name : ''} · {host.sim?.scene.title}</small></span>
+        <span><b>Tandem</b><small>{host.sim ? (host.sim.multi ? host.sim.robotIds.map((r) => host.sim.label(r)).join(' + ') : ARMS[host.armId()]?.name) : ''} · {host.sim?.scene.title}</small></span>
         <button className="btn sm" style={{ marginLeft: 'auto' }} disabled={running} onClick={() => startTour()}>Take the tour</button>
       </div>
     </div>

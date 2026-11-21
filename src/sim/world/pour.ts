@@ -5,8 +5,12 @@ import { objectTopZ } from './objects';
 const RATE = 0.5; // fraction of source capacity per second at full flow (≥ 30° past horizontal)
 
 export function stepPouring(s: SimState, dt: number) {
-  if (!s.holding) return;
-  const src = s.objects.find((o) => o.id === s.holding!.id);
+  const held = new Set(Object.values(s.robots).map((r) => r.holding?.id).filter((x): x is string => !!x));
+  for (const id of held) pourFrom(s, id, dt);
+}
+
+function pourFrom(s: SimState, id: string, dt: number) {
+  const src = s.objects.find((o) => o.id === id);
   if (!src?.container || src.container.fill <= 0) return;
   const upZ = col(src.pose, 2)[2];
   if (upZ >= 0) return; // tilt must exceed 90°

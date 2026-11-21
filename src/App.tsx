@@ -10,7 +10,7 @@ import { Splitter } from './ui/Splitter';
 import { startDemo } from './study/session';
 import { agentMode } from './agent/controller';
 import { TourOverlay, startTour } from './tour/Tour';
-import { TASKS } from './content';
+import { TASKS, isMultiArm } from './content';
 
 function Bokeh() {
   const bubbles = [[8, 70, 120, 0], [22, 18, 60, 4], [78, 12, 90, 8], [90, 64, 140, 2], [55, 85, 70, 6], [40, 6, 40, 10], [66, 40, 30, 3]];
@@ -53,7 +53,7 @@ export function App() {
         <Topbar />
         <main className="stage" ref={stageRef}>
           <ErrorBoundary label="cell view"><Viewport onAskAgent={am !== 'off' ? askAboutFault : undefined} /></ErrorBoundary>
-          <Splitter stage={stageRef} />
+          <Splitter stage={stageRef} wide={!!TASKS[taskId] && isMultiArm(TASKS[taskId])} />
           <ErrorBoundary label="teach pendant"><Pendant /></ErrorBoundary>
         </main>
       </div>

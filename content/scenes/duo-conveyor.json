@@ -1,0 +1,261 @@
+{
+ "id": "duo-conveyor",
+ "title": "Twin Pick Cell",
+ "environment": "factory",
+ "fixtures": [
+  {
+   "id": "table",
+   "kind": "box",
+   "center": [
+    450,
+    0,
+    -20
+   ],
+   "size": [
+    1500,
+    1900,
+    40
+   ],
+   "color": "#e9eef3",
+   "mount": true
+  },
+  {
+   "id": "conveyor",
+   "kind": "conveyor",
+   "center": [
+    900,
+    0,
+    40
+   ],
+   "size": [
+    560,
+    170,
+    80
+   ],
+   "color": "#3d4652"
+  },
+  {
+   "id": "bin_left",
+   "kind": "bin",
+   "center": [
+    330,
+    660,
+    60
+   ],
+   "size": [
+    220,
+    220,
+    120
+   ],
+   "color": "#cfe3f7",
+   "label": "Left bin"
+  },
+  {
+   "id": "bin_right",
+   "kind": "bin",
+   "center": [
+    330,
+    -660,
+    60
+   ],
+   "size": [
+    220,
+    220,
+    120
+   ],
+   "color": "#ffe0c4",
+   "label": "Right bin"
+  }
+ ],
+ "objects": [],
+ "regions": [
+  {
+   "id": "left_bin",
+   "center": [
+    330,
+    660,
+    150
+   ],
+   "size": [
+    210,
+    210,
+    300
+   ],
+   "label": "Left bin"
+  },
+  {
+   "id": "right_bin",
+   "center": [
+    330,
+    -660,
+    150
+   ],
+   "size": [
+    210,
+    210,
+    300
+   ],
+   "label": "Right bin"
+  }
+ ],
+ "io": {
+  "inputs": [
+   {
+    "name": "part_present",
+    "initial": false
+   },
+   {
+    "name": "part_color",
+    "initial": "none"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "conveyor_run",
+    "initial": true
+   }
+  ]
+ },
+ "conveyors": [
+  {
+   "id": "infeed",
+   "start": [
+    1160,
+    0,
+    80
+   ],
+   "end": [
+    640,
+    0,
+    80
+   ],
+   "speed": 160,
+   "runOutput": "conveyor_run",
+   "sensorInput": "part_present",
+   "colorInput": "part_color",
+   "spawn": {
+    "intervalSec": 6,
+    "jitterSec": 0,
+    "count": 6,
+    "colors": [
+     "red",
+     "blue"
+    ],
+    "cycle": true,
+    "size": [
+     50,
+     50,
+     50
+    ],
+    "kind": "part"
+   }
+  }
+ ],
+ "sceneTargets": {},
+ "robots": [
+  {
+   "id": "A",
+   "label": "Left arm",
+   "armId": "gofa-like",
+   "base": {
+    "x": 0,
+    "y": 400,
+    "z": 0,
+    "rz": 0
+   },
+   "color": "#1a8cff",
+   "targets": {
+    "pick.above": {
+     "x": 640,
+     "y": -400,
+     "z": 230,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "pick": {
+     "x": 640,
+     "y": -400,
+     "z": 105,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "bin.drop": {
+     "x": 330,
+     "y": 260,
+     "z": 230,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "ready": {
+     "x": 450,
+     "y": 0,
+     "z": 300,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    }
+   }
+  },
+  {
+   "id": "B",
+   "label": "Right arm",
+   "armId": "gofa-like",
+   "base": {
+    "x": 0,
+    "y": -400,
+    "z": 0,
+    "rz": 0
+   },
+   "color": "#ff8a2a",
+   "targets": {
+    "pick.above": {
+     "x": 640,
+     "y": 400,
+     "z": 230,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "pick": {
+     "x": 640,
+     "y": 400,
+     "z": 105,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "bin.drop": {
+     "x": 330,
+     "y": -260,
+     "z": 230,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "ready": {
+     "x": 450,
+     "y": 0,
+     "z": 300,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    }
+   }
+  }
+ ],
+ "camera": {
+  "position": [
+   -1250,
+   -150,
+   2650
+  ],
+  "target": [
+   560,
+   0,
+   0
+  ]
+ }
+}

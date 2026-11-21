@@ -8,7 +8,7 @@ import { initMusic } from './audio/music';
 import { useApp } from './store';
 import { initPlanTracking } from './agent/plans';
 import { host } from './simHost';
-import { programSource } from './editor/program';
+import { programText } from './editor/program';
 
 const App = lazy(() => import('./App').then((m) => ({ default: m.App })));
 const Landing = lazy(() => import('./landing/Landing'));
@@ -23,7 +23,7 @@ function boot() {
   useApp.getState().set({ route: editor ? 'landing' : route }); // 'landing' keeps music off in the editor unless toggled
 
   initSound();
-  initPlanTracking(host, programSource);
+  initPlanTracking(host, () => programText());
   const syncMusic = initMusic(() => {
     const s = useApp.getState();
     return s.route === 'landing' ? s.landingMusic : s.mode === 'demo' && sound.prefs.music;
@@ -54,5 +54,10 @@ if (import.meta.env.DEV || import.meta.env.VITE_E2E === 'true') {
     const w = window as unknown as Record<string, unknown>;
     w.__tandem = { useApp: store.useApp, host: sh.host, programSource: prog.programSource, updateWorkspace: store.updateWorkspace, flushLogs: logger.flush, sound: snd.sound, music: mus.music, endTour: tour.endTour, playGhost: ghost.playGhost };
     w.__tandemSetSteps = (s: Parameters<typeof steps.stepsToWorkspaceJson>[0]) => store.updateWorkspace({ blocks: { ...steps.stepsToWorkspaceJson(s), __external: true } });
+    // multi-arm: one step list per robot id, loaded into the block lanes
+    w.__tandemSetLanes = (l: Parameters<typeof steps.lanesToWorkspaceJson>[0]) => {
+      const sim = sh.host.sim;
+      store.updateWorkspace({ blocks: { ...steps.lanesToWorkspaceJson(l, Object.fromEntries(sim.robotIds.map((r) => [r, sim.label(r)])), sim.robotIds), __external: true } });
+    };
   });
 }

@@ -2,22 +2,26 @@ import { useEffect, useRef } from 'react';
 import * as monaco from 'monaco-editor';
 import type { Proposal } from '../store';
 import { currentWorkspace } from '../store';
+import { joinLanes } from '../runtime/headless';
 
 export default function DiffModal({ proposal, onClose, onAccept, onReject }: { proposal: Proposal; onClose(): void; onAccept(edited?: string): void; onReject(): void }) {
   const ref = useRef<HTMLDivElement>(null);
   const ed = useRef<monaco.editor.IStandaloneDiffEditor | null>(null);
-  const original = currentWorkspace().code;
+  // multi-arm: every arm's program in one diff, each after a `// @lane <id>` line (edits are split back per arm)
+  const ws = currentWorkspace();
+  const original = ws.lanes ? joinLanes(Object.fromEntries(Object.entries(ws.lanes).map(([r, l]) => [r, l.code]))) : ws.code;
+  const suggested = proposal.newPrograms ? joinLanes(proposal.newPrograms) : proposal.newProgram ?? '';
   useEffect(() => {
     const e = monaco.editor.createDiffEditor(ref.current!, { theme: 'tandem', automaticLayout: true, renderSideBySide: true, originalEditable: false, fontFamily: 'JetBrains Mono, monospace', fontSize: 12.5, minimap: { enabled: false }, scrollBeyondLastLine: false });
     const a = monaco.editor.createModel(original, 'javascript');
-    const b = monaco.editor.createModel(proposal.newProgram ?? '', 'javascript');
+    const b = monaco.editor.createModel(suggested, 'javascript');
     e.setModel({ original: a, modified: b });
     ed.current = e;
     return () => { e.dispose(); a.dispose(); b.dispose(); };
-  }, [original, proposal.newProgram]);
+  }, [original, suggested]);
   const accept = () => {
     const v = ed.current?.getModifiedEditor().getValue() ?? '';
-    onAccept(v !== (proposal.newProgram ?? '') ? v : undefined);
+    onAccept(v !== suggested ? v : undefined);
   };
   return (
     <div className="modal-back" onClick={onClose}>

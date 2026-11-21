@@ -90,7 +90,13 @@ export interface ObjectDef {
   container?: { capacity: number; fill: number };
   /** drawn instead of the box/cylinder; its bottom sits on the object's position */
   mesh?: MeshRef;
+  /** Too wide/heavy for one gripper: it only lifts in a synced move where every arm holding it takes part (SPEC §21.3). */
+  twoHanded?: boolean;
 }
+/** Planar mount of one arm in a multi-arm cell: position in mm, yaw (rz) in degrees about world Z. */
+export interface RobotBase { x: number; y: number; z: number; rz: number }
+/** One arm of a multi-arm scene (SPEC §21.2). Its targets are in its own base frame. */
+export interface SceneRobotDef { id: string; label: string; armId: string; base: RobotBase; color?: string; targets?: Record<string, Pose> }
 export interface RegionDef { id: string; center: [number, number, number]; size: [number, number, number]; label?: string }
 export interface ConveyorDef {
   id: string;
@@ -100,7 +106,7 @@ export interface ConveyorDef {
   runOutput: string; // output name that runs the belt
   sensorInput: string; // input set true when a part waits at the end
   colorInput?: string; // optional input reporting the color at the sensor
-  spawn: { intervalSec: number; jitterSec: number; count: number; colors: string[]; size: [number, number, number]; kind: string; shape?: 'box' | 'cylinder'; prefill?: boolean; mesh?: MeshRef };
+  spawn: { intervalSec: number; jitterSec: number; count: number; colors: string[]; cycle?: boolean; size: [number, number, number]; kind: string; shape?: 'box' | 'cylinder'; prefill?: boolean; mesh?: MeshRef };
 }
 export interface SceneDef {
   id: string;
@@ -116,6 +122,8 @@ export interface SceneDef {
   colorSensors?: { input: string; region: string }[];
   presenceSensors?: { input: string; region: string }[];
   camera?: { position: [number, number, number]; target: [number, number, number] };
+  /** Multi-arm cells: one entry per arm (ids A, B, …). Absent = single-arm scene using the task's arm and `sceneTargets`. */
+  robots?: SceneRobotDef[];
 }
 
 // ---------------- Targets ----------------
@@ -123,7 +131,7 @@ export interface Target { name: string; pose: Pose; q?: number[]; source: 'taugh
 export type TargetRef = string | Pose;
 
 // ---------------- Commands & faults ----------------
-export type RobotCommand =
+type RobotCommandBody =
   | { op: 'moveJ' | 'moveL'; target: TargetRef; speed?: number }
   | { op: 'moveJoints'; jointsDeg: number[]; speed?: number }
   | { op: 'home'; speed?: number }
@@ -131,12 +139,19 @@ export type RobotCommand =
   | { op: 'wait'; ms: number }
   | { op: 'waitInput'; name: string; value: boolean | string; timeoutMs?: number }
   | { op: 'setOutput'; name: string; value: boolean | string }
-  | { op: 'query'; what: 'pose' | 'joints' | 'input' | 'holding'; name?: string };
+  | { op: 'query'; what: 'pose' | 'joints' | 'input' | 'holding'; name?: string }
+  /** Cross-lane sync (SPEC §21.3). Coordinated by the run scheduler, never passed to SimCore.begin. */
+  | { op: 'sync'; kind: 'wait' | 'follow' }
+  | { op: 'sync'; kind: 'move'; target: TargetRef; speed?: number };
+/** A command for one robot; `robot` defaults to the cell's first robot. */
+export type RobotCommand = RobotCommandBody & { robot?: string };
 
 export type FaultCode =
   | 'UNREACHABLE' | 'JOINT_LIMIT' | 'SINGULARITY' | 'COLLISION' | 'INVALID_ARG'
-  | 'TIMEOUT' | 'RUNAWAY' | 'USER_ERROR' | 'SIM_TIME_LIMIT';
-export interface Fault { code: FaultCode; message: string; line?: number; blockId?: string; detail?: unknown }
+  | 'TIMEOUT' | 'RUNAWAY' | 'USER_ERROR' | 'SIM_TIME_LIMIT'
+  | 'ARM_COLLISION' | 'SHARED_GRASP' | 'NEEDS_TWO_HANDS' | 'SYNC_MISMATCH';
+/** `robot` names the arm (lane) the fault belongs to in multi-arm cells. */
+export interface Fault { code: FaultCode; message: string; line?: number; blockId?: string; robot?: string; detail?: unknown }
 
 export const FAULT_HELP: Record<FaultCode, string> = {
   UNREACHABLE: 'The target is outside the arm’s workspace, or no joint solution reaches it with that orientation.',
@@ -148,6 +163,10 @@ export const FAULT_HELP: Record<FaultCode, string> = {
   RUNAWAY: 'The program kept running without commanding the robot. Is there a loop with no motion or wait inside?',
   USER_ERROR: 'Your program threw an error.',
   SIM_TIME_LIMIT: 'The run exceeded the task’s simulated time limit.',
+  ARM_COLLISION: 'Two arms would hit each other. Add a “Wait for each other” so one arm moves out of the way first, or change a position.',
+  SHARED_GRASP: 'More than one arm is holding this part, so one arm can’t move it alone. Open one gripper, or use “Move together”.',
+  NEEDS_TWO_HANDS: 'This part is too wide for one gripper. Grip it with both arms, then lift it with “Move together”.',
+  SYNC_MISMATCH: 'The arms’ programs don’t have matching sync blocks, so one arm would wait forever. Every program needs the same “Wait for each other” and “Move together” blocks, in the same order.',
 };
 
 // ---------------- World state (pure data, structured-cloneable) ----------------
@@ -159,18 +178,30 @@ export interface ObjState {
   toppled?: boolean;
   onConveyor?: string | null;
   spilled?: number;
+  twoHanded?: boolean;
+  /** Mid-air transfers: `to` grasped the part while `from` was holding it. */
+  handovers?: { from: string; to: string }[];
 }
-export interface ActiveMotion {
-  kind: 'path';
-  times: number[]; // cumulative seconds
-  qs: number[][];
-  t: number;
+export interface ActiveCommand {
+  cmd: RobotCommand;
+  /** true while a planned path is being followed */
+  motion?: boolean;
+  until?: number;
+  startTime: number;
+  onDone?: { gripper?: 'open' | 'close' };
+}
+/** Per-arm state. Joints, TCP and targets are in the arm's own base frame. */
+export interface RobotState {
+  q: number[];
+  gripperOpen: boolean;
+  /** rel = held object's pose relative to this arm's TCP */
+  holding: null | { id: string; rel: M4 };
+  active: null | ActiveCommand;
+  targets: Record<string, Target>;
 }
 export interface SimState {
   simTime: number;
-  q: number[];
-  gripperOpen: boolean;
-  holding: null | { id: string; rel: M4 };
+  robots: Record<string, RobotState>;
   objects: ObjState[];
   inputs: Record<string, boolean | string>;
   outputs: Record<string, boolean | string>;
@@ -178,19 +209,13 @@ export interface SimState {
   rng: number;
   spilled: number;
   faults: Fault[];
-  active: null | {
-    cmd: RobotCommand;
-    motion?: ActiveMotion;
-    until?: number;
-    startTime: number;
-    onDone?: { gripper?: 'open' | 'close' };
-  };
   spawnCounter: number;
-  targets: Record<string, Target>;
   totalLiquid: number;
 }
 
 export type StepResult = { status: 'idle' } | { status: 'running' } | { status: 'done'; value?: unknown } | { status: 'fault'; fault: Fault };
+/** A robot's command finished (or faulted) during SimCore.stepAll. */
+export type RobotEvent = { robot: string; status: 'done'; value?: unknown } | { robot: string; status: 'fault'; fault: Fault };
 
 // ---------------- Predicates ----------------
 export type PredicateDef =
@@ -204,14 +229,20 @@ export type PredicateDef =
   | { type: 'noFaults'; label?: string }
   | { type: 'simTimeBelow'; sec: number; label?: string }
   | { type: 'programCompleted'; label?: string }
-  | { type: 'targetTaught'; name: string; label?: string }
-  | { type: 'holding'; object?: string; label?: string };
+  | { type: 'targetTaught'; name: string; robot?: string; label?: string }
+  | { type: 'holding'; object?: string; robot?: string; label?: string }
+  | { type: 'objectOn'; object: string; on: string; tolMm?: number; label?: string }
+  | { type: 'handedOver'; object: string; from: string; to: string; label?: string }
+  | { type: 'noArmCollisions'; label?: string };
 export interface PredicateResult { label: string; pass: boolean; detail?: string }
 
 // ---------------- Agent view ----------------
+export interface AgentRobotView { arm: string; jointsDeg: number[]; tcp: Pose; gripper: 'open' | 'closed'; holding: string | null }
 export interface AgentStateView {
   simTimeSec: number;
-  robot: { arm: string; jointsDeg: number[]; tcp: Pose; gripper: 'open' | 'closed'; holding: string | null };
+  robot: AgentRobotView;
+  /** Multi-arm cells only: every arm, first one = `robot`. */
+  robots?: (AgentRobotView & { id: string; label: string })[];
   objects: { id: string; kind: string; color: string; position: [number, number, number]; upright: boolean; fill?: number }[];
   inputs: Record<string, boolean | string>;
   outputs: Record<string, boolean | string>;

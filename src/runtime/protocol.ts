@@ -2,21 +2,26 @@ import type { Fault, Pose, PredicateResult, RobotCommand } from '../sim/types';
 
 export type WireCommand = RobotCommand | { op: 'hl'; blockId: string };
 
+/** One robot's program in a run. Single-arm runs have one lane (robot "A"). */
+export interface LaneSpec { robot: string; src: string; targets: Record<string, Pose> }
+
 export type MainToWorker =
-  | { t: 'start'; runId: string; src: string; targets: Record<string, Pose> }
+  | { t: 'start'; runId: string; lanes: LaneSpec[] }
   | { t: 'reply'; id: number; ok: true; value?: unknown }
   | { t: 'reply'; id: number; ok: false; fault: Fault };
 
 export type WorkerToMain =
   | { t: 'ready' }
-  | { t: 'call'; id: number; cmd: WireCommand; line?: number }
-  | { t: 'log'; args: string[]; line?: number }
+  | { t: 'call'; lane: string; id: number; cmd: WireCommand; line?: number }
+  | { t: 'log'; lane: string; args: string[]; line?: number }
+  | { t: 'laneDone'; lane: string }
   | { t: 'done' }
-  | { t: 'error'; message: string; line?: number; fault?: Fault };
+  | { t: 'error'; lane: string; message: string; line?: number; fault?: Fault };
 
-/** One sample of robot motion recorded during a dry run (simulated seconds from the start of the run). */
-export interface GhostFrame { t: number; q: number[]; open: boolean }
-export interface TraceEntry { simTime: number; line?: number; blockId?: string; cmd: RobotCommand; result: 'ok' | Fault }
+/** One sample of robot motion recorded during a dry run (simulated seconds from the start of the run).
+ *  `q`/`open` are the first robot's; multi-arm runs add every robot under `robots`. */
+export interface GhostFrame { t: number; q: number[]; open: boolean; robots?: Record<string, { q: number[]; open: boolean }> }
+export interface TraceEntry { simTime: number; line?: number; blockId?: string; robot?: string; cmd: RobotCommand; result: 'ok' | Fault }
 export interface RunTrace {
   runId: string;
   source: 'user' | 'dryrun';

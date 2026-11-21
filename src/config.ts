@@ -20,3 +20,5 @@ const MODEL_PRICE: Record<string, number> = {
 };
 /** The demo starts on the cheapest allowed model; visitors can switch in the AI partner's model picker. */
 export const DEFAULT_DEMO_MODEL = [...CONFIG.demoModels].sort((a, b) => (MODEL_PRICE[a] ?? Infinity) - (MODEL_PRICE[b] ?? Infinity))[0] ?? 'gpt-5-nano';
+/** Multi-arm tasks are too hard for the smallest model: the demo starts them on gpt-5-mini when it's allowed. */
+export const DEFAULT_MULTI_ARM_MODEL = CONFIG.demoModels.includes('gpt-5-mini') ? 'gpt-5-mini' : DEFAULT_DEMO_MODEL;

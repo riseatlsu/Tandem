@@ -17,7 +17,13 @@ export type Step =
   | { ifHolding: true; do: Step[]; else?: Step[] }
   | { log: string }
   | { note: string }
-  | { raw: string };
+  | { raw: string }
+  // multi-arm only (SPEC §21.7): cross-lane syncs, top level of a lane only
+  | { sync: 'wait' }
+  | { sync: 'move'; target: string; speed?: number }
+  | { sync: 'follow' };
+/** A multi-arm block program: one step list per robot id. */
+export type Lanes = Record<string, Step[]>;
 
 export const STEP_SCHEMA_DOC = `Block programs are written as a JSON array of steps (executed top to bottom):
   {"home": true, "speed"?: 1-100}
@@ -33,6 +39,14 @@ export const STEP_SCHEMA_DOC = `Block programs are written as a JSON array of st
   {"ifHolding": true, "do": [steps], "else"?: [steps]}
   {"log": "text"}
   {"note": "text"}`;
+
+export const LANES_SCHEMA_DOC = `MULTI-ARM tasks: a program is {"lanes": {"A": [steps], "B": [steps]}}, one step list per arm (robot id).
+Each arm uses ITS OWN target names (they are in that arm's base frame). Extra steps, top level only (never inside loops/ifs):
+  {"sync": "wait"}                                   // "Wait for each other": every arm waits here until all arrive
+  {"sync": "move", "target": "<target>", "speed"?: n} // "Move together": this arm leads a straight-line move...
+  {"sync": "follow"}                                 // ...and every other arm has "follow" at the same position
+The k-th sync step of every lane pairs with the k-th of every other lane: same count, same order. At each position all
+arms have "wait", or exactly one has "move" and all others "follow".`;
 
 type BJ = Record<string, unknown>;
 let uid = 0;
@@ -111,10 +125,27 @@ function stepToBlock(s: Step, vars: Map<string, string>): BJ {
   if ('ifHolding' in s) return { type: 'gripper_if_holding', id: id('b'), inputs: { DO: chain(s.do), ELSE: chain(s.else) } };
   if ('log' in s) return { type: 'flow_log', id: id('b'), inputs: { MSG: { shadow: { type: 'text', fields: { TEXT: s.log } } } } };
   if ('note' in s) return { type: 'flow_note', id: id('b'), fields: { TEXT: s.note } };
+  if ('sync' in s) {
+    const ex = syncCtx.next();
+    if (s.sync === 'wait') return { type: 'sync_wait', id: id('b'), extraState: { syncId: ex.syncId } };
+    if (s.sync === 'move') return { type: 'sync_move', id: id('b'), fields: { TARGET: s.target, SPEED: s.speed ?? 30 }, extraState: { syncId: ex.syncId, role: 'lead', leader: syncCtx.lane } };
+    return { type: 'sync_move', id: id('b'), extraState: { syncId: ex.syncId, role: 'follow', leader: ex.leader ?? '' } };
+  }
   return { type: 'flow_note', id: id('b'), fields: { TEXT: `unsupported: ${JSON.stringify(s)}` } };
 }
+/** While building lanes: which lane is being built and how sync steps pair up across lanes. */
+const syncCtx = {
+  lane: '', k: 0, ids: [] as string[], leaders: [] as (string | undefined)[],
+  next() { const k = this.k++; return { syncId: this.ids[k] ?? id('sync'), leader: this.leaders[k] }; },
+};
+/** Blockly's JSON loader chokes on `inputs: { DO: undefined }` (an empty loop/if body): drop empty inputs. */
+function dropEmptyInputs(b: BJ): BJ {
+  const inputs = b.inputs as Record<string, unknown> | undefined;
+  if (inputs) for (const k of Object.keys(inputs)) if (inputs[k] === undefined) delete inputs[k];
+  return b;
+}
 function chainSteps(steps: Step[], vars: Map<string, string>): BJ {
-  const blocks = steps.map((s) => stepToBlock(s, vars));
+  const blocks = steps.map((s) => dropEmptyInputs(stepToBlock(s, vars)));
   for (let i = blocks.length - 2; i >= 0; i--) blocks[i].next = { block: blocks[i + 1] };
   return blocks[0];
 }
@@ -128,13 +159,27 @@ export function stepsToWorkspaceJson(steps: Step[]): object {
   };
 }
 
+/** Horizontal distance between lane hats (px, workspace units); the editor re-spaces lanes to fit their blocks. */
+export const LANE_SPACING = 380;
+/** Lanes → one Blockly workspace with a "lane_start" hat per arm, side by side (SPEC §21.5). */
+export function lanesToWorkspaceJson(lanes: Lanes, labels: Record<string, string>, order = Object.keys(lanes)): object {
+  const vars = new Map<string, string>();
+  // pair the k-th sync of every lane: one shared id, and the leader of each "move together"
+  const n = Math.max(0, ...order.map((r) => (lanes[r] ?? []).filter((x) => 'sync' in x).length));
+  const ids = Array.from({ length: n }, () => id('sync'));
+  const leaders = ids.map((_, k) => order.find((r) => { const st = (lanes[r] ?? []).filter((x) => 'sync' in x)[k]; return st && 'sync' in st && st.sync === 'move'; }));
+  const blocks = order.map((robot, i) => {
+    Object.assign(syncCtx, { lane: robot, k: 0, ids, leaders });
+    const start: BJ = { type: 'lane_start', id: `start_${robot}`, x: 30 + i * LANE_SPACING, y: 30, deletable: false, movable: false, extraState: { robot, label: labels[robot] ?? robot } };
+    const steps = lanes[robot] ?? [];
+    if (steps.length) start.next = { block: chainSteps(steps, vars) };
+    return start;
+  });
+  return { blocks: { languageVersion: 0, blocks }, variables: [...vars.entries()].map(([name, vid]) => ({ name, id: vid })) };
+}
+
 // ---------------- Blockly JSON → steps
-export function workspaceJsonToSteps(json: unknown): Step[] {
-  const j = json as { blocks?: { blocks?: BJ[] }; variables?: { name: string; id: string }[] };
-  const varNames = new Map((j?.variables ?? []).map((v) => [v.id, v.name]));
-  const top = j?.blocks?.blocks ?? [];
-  const start = top.find((b) => b.type === 'program_start');
-  if (!start) return [];
+function walker(varNames: Map<string, string>) {
   const walk = (b: BJ | undefined): Step[] => {
     const out: Step[] = [];
     let cur = b;
@@ -164,14 +209,40 @@ export function workspaceJsonToSteps(json: unknown): Step[] {
       case 'gripper_if_holding': return { ifHolding: true, do: sub('DO'), else: sub('ELSE') };
       case 'flow_log': { const m = inp.MSG?.block ?? inp.MSG?.shadow; return { log: String(((m?.fields ?? {}) as BJ).TEXT ?? '') }; }
       case 'flow_note': return { note: String(f.TEXT) };
+      case 'sync_wait': return { sync: 'wait' };
+      case 'sync_move': {
+        const ex = (b.extraState ?? {}) as { role?: string };
+        return ex.role === 'follow' ? { sync: 'follow' } : { sync: 'move', target: String(f.TARGET ?? ''), speed: Number(f.SPEED ?? 30) };
+      }
       default: return { raw: String(b.type) };
     }
   };
-  return walk((start.next as { block?: BJ } | undefined)?.block);
+  return walk;
+}
+type WsJson = { blocks?: { blocks?: BJ[] }; variables?: { name: string; id: string }[] };
+export function workspaceJsonToSteps(json: unknown): Step[] {
+  const j = json as WsJson;
+  const varNames = new Map((j?.variables ?? []).map((v) => [v.id, v.name]));
+  const start = (j?.blocks?.blocks ?? []).find((b) => b.type === 'program_start');
+  if (!start) return [];
+  return walker(varNames)((start.next as { block?: BJ } | undefined)?.block);
+}
+/** Multi-arm workspace → steps per robot id (lanes without a hat are omitted). */
+export function workspaceJsonToLanes(json: unknown): Lanes {
+  const j = json as WsJson;
+  const varNames = new Map((j?.variables ?? []).map((v) => [v.id, v.name]));
+  const walk = walker(varNames);
+  const out: Lanes = {};
+  for (const b of j?.blocks?.blocks ?? []) {
+    if (b.type !== 'lane_start') continue;
+    const robot = ((b.extraState ?? {}) as { robot?: string }).robot;
+    if (robot) out[robot] = walk((b.next as { block?: BJ } | undefined)?.block);
+  }
+  return out;
 }
 
 // ---------------- validation
-export interface StepEnv { targets: string[]; inputs: string[]; outputs: string[] }
+export interface StepEnv { targets: string[]; inputs: string[]; outputs: string[]; /** set when validating a lane of a multi-arm program */ lanes?: boolean }
 export function validateSteps(steps: unknown, env: StepEnv, path = 'steps'): string[] {
   const errs: string[] = [];
   if (!Array.isArray(steps)) return [`${path} must be an array`];
@@ -194,8 +265,37 @@ export function validateSteps(steps: unknown, env: StepEnv, path = 'steps'): str
     else if (has('ifInput')) { if (!env.inputs.includes(o.ifInput as string)) errs.push(`${p}: unknown input "${o.ifInput}"`); errs.push(...validateSteps(o.do, env, `${p}.do`)); if (has('else')) errs.push(...validateSteps(o.else, env, `${p}.else`)); }
     else if (has('ifHolding')) { errs.push(...validateSteps(o.do, env, `${p}.do`)); if (has('else')) errs.push(...validateSteps(o.else, env, `${p}.else`)); }
     else if (has('log') || has('note')) { /* ok */ }
+    else if (has('sync')) {
+      if (!env.lanes) errs.push(`${p}: sync steps only exist in multi-arm tasks`);
+      else if (/\.(do|else)\b/.test(path)) errs.push(`${p}: sync steps must be at the top level of a lane, not inside a loop or if`);
+      if (o.sync === 'move') { tgt('target'); speedOk(); }
+      else if (o.sync !== 'wait' && o.sync !== 'follow') errs.push(`${p}.sync must be "wait", "move" or "follow"`);
+    }
     else errs.push(`${p}: unknown step ${JSON.stringify(o).slice(0, 80)}`);
   });
+  return errs;
+}
+
+/** Validate a multi-arm program: every lane against its own arm's targets, then that the sync steps pair up. */
+export function validateLanes(lanes: unknown, envFor: (robot: string) => StepEnv | null, robots: string[]): string[] {
+  if (!lanes || typeof lanes !== 'object' || Array.isArray(lanes)) return ['lanes must be an object {"A": [steps], "B": [steps]}'];
+  const errs: string[] = [];
+  const L = lanes as Record<string, unknown>;
+  for (const r of Object.keys(L)) if (!robots.includes(r)) errs.push(`unknown arm "${r}" (arms: ${robots.join(', ')})`);
+  for (const r of robots) {
+    if (!(r in L)) { errs.push(`lanes.${r} is missing (every arm needs a lane, even an empty one)`); continue; }
+    const env = envFor(r);
+    if (env) errs.push(...validateSteps(L[r], { ...env, lanes: true }, `lanes.${r}`));
+  }
+  if (errs.length) return errs;
+  const kinds = robots.map((r) => (L[r] as Step[]).filter((x) => 'sync' in x).map((x) => (x as { sync: string }).sync));
+  const n = Math.max(...kinds.map((k) => k.length));
+  if (kinds.some((k) => k.length !== n)) errs.push(`every lane needs the same number of sync steps (${robots.map((r, i) => `${r}: ${kinds[i].length}`).join(', ')})`);
+  else for (let k = 0; k < n; k++) {
+    const at = kinds.map((x) => x[k]);
+    const ok = at.every((x) => x === 'wait') || (at.filter((x) => x === 'move').length === 1 && at.every((x) => x === 'move' || x === 'follow'));
+    if (!ok) errs.push(`sync #${k + 1} doesn't match (${robots.map((r, i) => `${r}: ${at[i]}`).join(', ')}): all "wait", or one "move" and the rest "follow"`);
+  }
   return errs;
 }
 
@@ -219,9 +319,11 @@ export function stepsToJs(steps: Step[], indent = ''): string {
     else if ('ifHolding' in s) out += L(`if (await gripper.holding()) {`) + stepsToJs(s.do, indent + '  ') + L('} else {') + stepsToJs(s.else ?? [], indent + '  ') + L('}');
     else if ('log' in s) out += L(`log(${lit(s.log)});`);
     else if ('note' in s) out += L(`// ${s.note}`);
+    else if ('sync' in s) out += L(s.sync === 'wait' ? 'await sync();' : s.sync === 'move' ? `await robot.moveTogether(${lit(s.target)}, { speed: ${s.speed ?? 30} });` : 'await robot.follow();');
   }
   return out;
 }
+export const lanesToJs = (lanes: Lanes): Record<string, string> => Object.fromEntries(Object.entries(lanes).map(([r, st]) => [r, stepsToJs(st)]));
 
 /** Starter blocks from task JSON ([{type:'robot_home'}, ...]) */
 export function starterToSteps(starter: { type: string }[] | undefined): Step[] {

@@ -23,6 +23,10 @@ declare const robot: {
   getJoints(): Promise<number[]>;
   /** Wait a number of milliseconds (simulated time). */
   wait(ms: number): Promise<void>;
+  /** Multi-arm: lead a move together. This arm moves in a straight line; every other arm calls robot.follow() at the same point and keeps its distance. */
+  moveTogether(target: TargetLike, opts?: MoveOpts): Promise<void>;
+  /** Multi-arm: follow the arm that calls robot.moveTogether() at this point, keeping the same distance to it. */
+  follow(): Promise<void>;
 };
 declare const gripper: {
   open(): Promise<void>;
@@ -49,4 +53,6 @@ declare const targets: {
 declare function offset(p: TargetLike, dx: number, dy: number, dz: number): Pose;
 /** Print to the console panel. */
 declare function log(...args: unknown[]): void;
+/** Multi-arm: wait for each other. Resolves once every arm's program reaches its matching sync(). */
+declare function sync(): Promise<void>;
 `;

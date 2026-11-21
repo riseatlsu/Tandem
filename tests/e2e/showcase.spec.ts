@@ -6,7 +6,7 @@ test('landing page: showcase sections, launches the demo and a chosen level', as
   // software WebGL in CI compiles the hero's shaders slowly; real GPUs show the page in well under a second
   await expect(page.getByRole('heading', { name: /Program cobots/ })).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('.hero-cell canvas')).toBeVisible();
-  await expect(page.locator('.l-level')).toHaveCount(8);
+  await expect(page.locator('.l-level')).toHaveCount(12);
   await expect(page.locator('.lineup-canvas canvas')).toHaveCount(0); // created lazily
   await page.locator('#robots').scrollIntoViewIfNeeded();
   await expect(page.locator('.lineup-canvas canvas')).toBeAttached({ timeout: 60_000 });

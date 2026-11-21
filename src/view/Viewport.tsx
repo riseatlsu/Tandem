@@ -43,20 +43,22 @@ export function Viewport({ onAskAgent }: { onAskAgent?: () => void }) {
         if (useApp.getState().handGuideBlocked !== !ok) set({ handGuideBlocked: !ok });
         return ok;
       },
-      onGuideStart: () => { guideStats.current = { fails: 0, start: JSON.stringify(host.sim.tcpPose()) }; logEvent('handguide_start', { pose: host.sim.tcpPose() }); },
-      onGuideEnd: () => { set({ handGuideBlocked: false }); logEvent('handguide_end', { pose: host.sim.tcpPose(), ikFailures: guideStats.current.fails }); },
+      onGuideStart: () => { const a = host.arm(); guideStats.current = { fails: 0, start: JSON.stringify(host.sim.tcpPose(a)) }; logEvent('handguide_start', { pose: host.sim.tcpPose(a), ...(host.sim.multi ? { robot: a } : {}) }); },
+      onGuideEnd: () => { const a = host.arm(); set({ handGuideBlocked: false }); logEvent('handguide_end', { pose: host.sim.tcpPose(a), ikFailures: guideStats.current.fails, ...(host.sim.multi ? { robot: a } : {}) }); },
       onCameraMove: () => { const now = Date.now(); if (now - lastCam > 2000) { lastCam = now; logEvent('camera_move', { position: s3.camera.position.toArray().map((v) => +v.toFixed(2)) }); } },
     }, (dt) => {
       if (!host.sim) return null;
       host.frame(dt);
+      if (sceneRef.current) sceneRef.current.selectedArm = host.arm(); // the first frame runs inside the constructor
       const st = host.sim.s;
-      soundFrame(st.q, st.gripperOpen, st.holding?.id ?? null,
+      const r0 = host.sim.rs(host.arm());
+      soundFrame(r0.q, r0.gripperOpen, r0.holding?.id ?? null,
         useApp.getState().runState === 'running' && host.sim.scene.conveyors.some((c) => st.outputs[c.runOutput] === true));
       const now = performance.now();
       if (now - lastRead > 120) {
         lastRead = now;
-        const p = host.sim.tcpPose();
-        setTcp(`X ${p.x.toFixed(1)}  Y ${p.y.toFixed(1)}  Z ${p.z.toFixed(1)}  ·  Rx ${p.rx.toFixed(0)}°  Ry ${p.ry.toFixed(0)}°  Rz ${p.rz.toFixed(0)}°`);
+        const p = host.sim.tcpPose(host.arm());
+        setTcp(`${host.sim.multi ? `${host.sim.label(host.arm())} · ` : ''}X ${p.x.toFixed(1)}  Y ${p.y.toFixed(1)}  Z ${p.z.toFixed(1)}  ·  Rx ${p.rx.toFixed(0)}°  Ry ${p.ry.toFixed(0)}°  Rz ${p.rz.toFixed(0)}°`);
       }
       return host.sim;
     });
@@ -69,7 +71,7 @@ export function Viewport({ onAskAgent }: { onAskAgent?: () => void }) {
         const steps = 10;
         let ok = true;
         for (let i = 1; i <= steps; i++) {
-          const T = host.sim.tcp().slice();
+          const T = host.sim.tcpWorld(host.arm()).slice();
           T[12] += dxMm / 1000 / steps; T[13] += dyMm / 1000 / steps; T[14] += dzMm / 1000 / steps;
           ok = cb.onGuide(T) && ok;
         }
@@ -77,14 +79,34 @@ export function Viewport({ onAskAgent }: { onAskAgent?: () => void }) {
         return ok;
       };
     }
-    return () => { s3.dispose(); sceneRef.current = null; };
+    // multi-arm: clicking an arm (without dragging the camera) selects it for Jog / Positions
+    let down: [number, number] | null = null;
+    const el = ref.current;
+    const onDown = (e: PointerEvent) => { down = [e.clientX, e.clientY]; };
+    const onUp = (e: PointerEvent) => {
+      if (!down || !host.sim?.multi || useApp.getState().handGuide) return;
+      const moved = Math.hypot(e.clientX - down[0], e.clientY - down[1]);
+      down = null;
+      if (moved > 4) return;
+      const id = s3.pickArm(e.clientX, e.clientY);
+      if (id) host.selectArm(id);
+    };
+    el.addEventListener('pointerdown', onDown);
+    el.addEventListener('pointerup', onUp);
+    return () => { el.removeEventListener('pointerdown', onDown); el.removeEventListener('pointerup', onUp); s3.dispose(); sceneRef.current = null; };
   }, [set]);
 
   useEffect(() => { sceneRef.current?.setGuide(handGuide, hgMode); }, [handGuide, hgMode]);
   useEffect(() => { sceneRef.current?.setTargetsVisible(showFrames); }, [showFrames]);
-  useEffect(() => { if (fault) sceneRef.current?.flashFault(); }, [fault]);
+  useEffect(() => {
+    if (!fault) return;
+    const arms = (fault.detail as { arms?: string[] } | undefined)?.arms;
+    if (arms) arms.forEach((a) => sceneRef.current?.flashFault(a));
+    else sceneRef.current?.flashFault(fault.robot);
+  }, [fault]);
 
-  const armName = host.sim ? ARMS[host.armId()]?.name : '';
+  const multi = !!host.sim?.multi;
+  const armName = host.sim ? (multi ? `${host.sim.robotIds.length} arms` : ARMS[host.armId()]?.name) : '';
   void taskId; void armOverride;
 
   return (
@@ -127,7 +149,7 @@ export function Viewport({ onAskAgent }: { onAskAgent?: () => void }) {
       </div>
       {fault && !showSuccess && (
         <div className="fault-card" role="alert">
-          <div className="row"><span className="code">PROTECTIVE STOP · {fault.code}</span><span className="grow" />
+          <div className="row"><span className="code">PROTECTIVE STOP · {fault.code}{multi && fault.robot ? ` · ${host.sim.label(fault.robot)}` : ''}</span><span className="grow" />
             <button className="icon-btn" aria-label="Dismiss" onClick={() => set({ fault: null })}><Icon.x /></button></div>
           <div className="title">{fault.message}</div>
           <div className="muted">{FAULT_HELP[fault.code]}{fault.line && editor === 'code' ? ` · line ${fault.line}` : fault.blockId ? ' · the block is marked in your program' : ''}</div>

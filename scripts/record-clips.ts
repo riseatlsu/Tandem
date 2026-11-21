@@ -4,9 +4,9 @@
  *
  *   npm run mock-llm                                    # terminal 1 (the AI clip uses the scripted mock)
  *   VITE_BASE=/ VITE_E2E=true VITE_FIREBASE_API_KEY= VITE_LLM_PROXY_URL=http://localhost:8787 npx vite --port 5180   # terminal 2
- *   npx tsx scripts/record-clips.ts [--url http://localhost:5180] [--only jog-joystick,run-program] [--no-thumbs]
+ *   npx tsx scripts/record-clips.ts [--url http://localhost:5180] [--only jog-joystick,run-program] [--no-thumbs] [--thumbs-only (missing thumbnails only)]
  */
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { chromium, type Page } from '@playwright/test';
 import { decodePng, downscale, encodeGif, type RGBA } from './lib/gif';
 
@@ -30,6 +30,19 @@ async function open(page: Page, task: string, screen?: string) {
   await sleep(1800); // meshes + fonts
 }
 const T = (page: Page, js: string) => page.evaluate(`(async () => { const T = window.__tandem; ${js} })()`);
+/** Multi-arm tasks: load one step list per arm into the block lanes. */
+const setLanes = async (page: Page, lanes: Record<string, unknown[]>) => {
+  await T(page, `T.useApp.getState().set({ pendantScreen: 'program' }); return null;`);
+  await page.evaluate((l) => (window as unknown as { __tandemSetLanes(l: unknown): void }).__tandemSetLanes(l), lanes);
+};
+const TUTORIAL = {
+  A: [{ move: 'block.above' }, { gripper: 'open' }, { move: 'block', mode: 'linear' }, { gripper: 'close' }, { move: 'block.above', mode: 'linear' }, { move: 'middle.above' }, { move: 'middle', mode: 'linear' }, { gripper: 'open' }, { move: 'middle.above', mode: 'linear' }, { move: 'ready' }, { sync: 'wait' }, { sync: 'wait' }, { sync: 'move', target: 'ready.low' }],
+  B: [{ gripper: 'open' }, { sync: 'wait' }, { move: 'middle.above' }, { move: 'middle', mode: 'linear' }, { gripper: 'close' }, { move: 'middle.above', mode: 'linear' }, { move: 'right.above' }, { move: 'right', mode: 'linear' }, { gripper: 'open' }, { move: 'right.above', mode: 'linear' }, { move: 'ready' }, { sync: 'wait' }, { sync: 'follow' }],
+};
+const ASSEMBLY = {
+  A: [{ gripper: 'open' }, { move: 'prop.above' }, { move: 'prop', mode: 'linear' }, { gripper: 'close' }, { sync: 'wait' }, { sync: 'move', target: 'prop.lift' }, { sync: 'move', target: 'prop.over' }],
+  B: [{ gripper: 'open' }, { move: 'prop.above' }, { move: 'prop', mode: 'linear' }, { gripper: 'close' }, { sync: 'wait' }, { sync: 'follow' }, { sync: 'follow' }],
+};
 const setSteps = (page: Page, steps: unknown[]) => page.evaluate((s) => (window as unknown as { __tandemSetSteps(s: unknown[]): void }).__tandemSetSteps(s), steps);
 
 /** Captures frames (DevTools screencast, ~15 fps) while `action` runs (plus `tail` ms after), then writes the GIF. */
@@ -192,6 +205,43 @@ const CLIPS: Record<string, (p: Page) => Promise<void>> = {
       await sleep(1300);
     });
   },
+  'sync-wait': async (p) => {
+    await open(p, 'duo-tutorial', 'program');
+    await setLanes(p, TUTORIAL);
+    await sleep(1500);
+    await record(p, 'sync-wait', async () => {
+      await T(p, `T.host.setSpeed(1.5); return null;`);
+      await p.getByRole('button', { name: /^Run/ }).click();
+      await sleep(7500);
+    }, 400);
+    await T(p, `T.host.stop(); return null;`);
+  },
+  'move-together': async (p) => {
+    await open(p, 'duo-assembly', 'program');
+    await setLanes(p, ASSEMBLY);
+    await sleep(1500);
+    await record(p, 'move-together', () => runAndWait(p, 1.5, 20_000), 1200);
+  },
+  'teach-all-arms': async (p) => {
+    await open(p, 'duo-handover', 'jog');
+    await record(p, 'teach-all-arms', async () => {
+      await sleep(400);
+      await p.getByRole('tab', { name: 'Right arm' }).click();
+      await sleep(500);
+      await dragStick(p, 0, 40, 700);
+      await sleep(300);
+      await p.getByRole('tab', { name: 'Left arm' }).click();
+      await sleep(500);
+      await dragStick(p, 0, 40, 700);
+      await sleep(300);
+      await T(p, `T.useApp.getState().set({ pendantScreen: 'positions' }); return null;`);
+      await sleep(700);
+      await p.getByRole('button', { name: /Teach all arms at once/ }).click();
+      await sleep(900);
+      await p.getByRole('tab', { name: 'Right arm' }).click();
+      await sleep(1200);
+    });
+  },
   'ai-suggestion': async (p) => {
     await fetch('http://localhost:8787/__reset', { method: 'POST' });
     await p.evaluate(() => localStorage.setItem('tandem.agentPos', JSON.stringify({ right: 24, bottom: 84 }))); // over the pendant, so the ghost is visible
@@ -216,6 +266,7 @@ async function thumbs(page: Page) {
   // every task listed in the demo gets a landing-page thumbnail
   const demo = readdirSync('content/tasks').map((f) => JSON.parse(readFileSync(`content/tasks/${f}`, 'utf8')) as { id: string; demo?: unknown }).filter((t) => t.demo).map((t) => t.id);
   for (const id of demo) {
+    if (args.includes('--thumbs-only') && existsSync(`public/landing/levels/${id}.jpg`)) continue; // only the missing ones
     await open(page, id);
     await T(page, `T.useApp.getState().set({ showFrames: false }); return null;`);
     await page.addStyleTag({ content: '.vp-overlay{display:none!important}' });
@@ -234,6 +285,6 @@ await page.goto(URL);
 await page.evaluate(() => localStorage.clear());
 const reset = () => page.evaluate(() => localStorage.removeItem('tandem.agentPos'));
 mkdirSync('public/clips', { recursive: true });
-for (const [id, fn] of Object.entries(CLIPS)) if (!ONLY || ONLY.includes(id)) { await fn(page); await reset(); }
-if (!args.includes('--no-thumbs') && !ONLY) await thumbs(page);
+if (!args.includes('--thumbs-only')) for (const [id, fn] of Object.entries(CLIPS)) if (!ONLY || ONLY.includes(id)) { await fn(page); await reset(); }
+if (args.includes('--thumbs-only') || (!args.includes('--no-thumbs') && !ONLY)) await thumbs(page);
 await browser.close();

@@ -16,6 +16,7 @@ firebase-debug.log*
 firestore-debug.log*
 ui-debug.log*
 .firebase/
+refs/
 
 # Service-account keys and participant codes: never commit
 keys/

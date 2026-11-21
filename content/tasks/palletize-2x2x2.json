@@ -1,10 +1,121 @@
 {
-  "id": "palletize-2x2x2", "title": "Palletize 2×2×2", "sceneId": "palletize-sort", "armId": "gofa-like", "seed": 7,
-  "editor": "code", "passOn": "run",
-  "brief": "Stack eight cubes on the pallet in a **2 × 2** grid, **2 layers** high. Cubes are 50 mm; use a 70 mm pitch.\n\n`offset(target, dx, dy, dz)` returns a pose shifted from a target — perfect for grids. `pallet.corner` is the first slot on the bottom layer.",
-  "predicates": [{ "type": "stackPattern", "region": "pallet", "kind": "part", "rows": 2, "cols": 2, "layers": 2, "label": "2×2×2 stack on the pallet" }, { "type": "programCompleted" }, { "type": "noFaults" }],
-  "conveyorOverrides": { "infeed": { "count": 8, "colors": ["orange"], "intervalSec": 3, "jitterSec": 0 } },
-  "starter": { "code": "await robot.home();\nconst pitch = 70;\n\nfor (let layer = 0; layer < 2; layer++) {\n  for (let row = 0; row < 2; row++) {\n    for (let col = 0; col < 2; col++) {\n      // pick the next cube, then place it at\n      // offset('pallet.corner', col * pitch, row * pitch, layer * 50)\n    }\n  }\n}\n" },
-  "demo": { "order": 60 },
-  "difficulty": 3
+  "id": "palletize-2x2x2",
+  "title": "Fix the palletizer",
+  "sceneId": "palletize-sort",
+  "armId": "gofa-like",
+  "seed": 7,
+  "editor": "blocks",
+  "passOn": "run",
+  "brief": "This program should stack eight cubes on the pallet: a **2 × 2** grid, **2 layers** high, with a 70 mm pitch. It runs, but the stack comes out wrong. It has **three bugs**.\n\nRun it, watch what the robot does, and fix the blocks. `pallet.corner` is the first slot on the bottom layer; “Move to … shifted by X Y Z” moves relative to it.",
+  "predicates": [
+    {
+      "type": "stackPattern",
+      "region": "pallet",
+      "kind": "part",
+      "rows": 2,
+      "cols": 2,
+      "layers": 2,
+      "label": "2×2×2 stack on the pallet"
+    },
+    {
+      "type": "programCompleted"
+    },
+    {
+      "type": "noFaults"
+    }
+  ],
+  "conveyorOverrides": {
+    "infeed": {
+      "count": 8,
+      "colors": [
+        "orange"
+      ],
+      "intervalSec": 3,
+      "jitterSec": 0
+    }
+  },
+  "starter": {
+    "steps": [
+      {
+        "home": true
+      },
+      {
+        "gripper": "open"
+      },
+      {
+        "forEach": "layer",
+        "from": 0,
+        "to": 0,
+        "do": [
+          {
+            "forEach": "row",
+            "from": 0,
+            "to": 1,
+            "do": [
+              {
+                "forEach": "col",
+                "from": 0,
+                "to": 1,
+                "do": [
+                  {
+                    "waitInput": "part_present",
+                    "value": true
+                  },
+                  {
+                    "move": "pick.approach"
+                  },
+                  {
+                    "move": "pick",
+                    "mode": "linear"
+                  },
+                  {
+                    "gripper": "close"
+                  },
+                  {
+                    "move": "pick.approach",
+                    "mode": "linear"
+                  },
+                  {
+                    "moveOffset": "pallet.corner",
+                    "dx": "col * 70",
+                    "dy": "col * 70",
+                    "dz": "layer * 50 + 150"
+                  },
+                  {
+                    "moveOffset": "pallet.corner",
+                    "dx": "col * 70",
+                    "dy": "col * 70",
+                    "dz": 0,
+                    "mode": "linear"
+                  },
+                  {
+                    "gripper": "open"
+                  },
+                  {
+                    "moveOffset": "pallet.corner",
+                    "dx": "col * 70",
+                    "dy": "col * 70",
+                    "dz": "layer * 50 + 150",
+                    "mode": "linear"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "home": true
+      }
+    ]
+  },
+  "demo": {
+    "order": 60
+  },
+  "difficulty": 3,
+  "hints": [
+    "Count the cubes on the pallet when the program ends. How many layers does the outer loop make?",
+    "The rows and the columns should use different counters. Check what is shifted in X and what in Y.",
+    "Where does the second layer go? Compare the height of the approach move with the height of the move down."
+  ]
 }

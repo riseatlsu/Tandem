@@ -1,0 +1,322 @@
+{
+ "id": "duo-assembly",
+ "title": "Assembly Station",
+ "environment": "factory",
+ "fixtures": [
+  {
+   "id": "table",
+   "kind": "box",
+   "center": [
+    450,
+    0,
+    -20
+   ],
+   "size": [
+    1500,
+    1900,
+    40
+   ],
+   "color": "#e9eef3",
+   "mount": true
+  },
+  {
+   "id": "pedestal",
+   "kind": "box",
+   "center": [
+    450,
+    0,
+    30
+   ],
+   "size": [
+    80,
+    80,
+    60
+   ],
+   "color": "#9aa5b1",
+   "label": "Pedestal"
+  },
+  {
+   "id": "spacer_tray",
+   "kind": "box",
+   "center": [
+    450,
+    640,
+    5
+   ],
+   "size": [
+    120,
+    120,
+    10
+   ],
+   "color": "#cfe3f7",
+   "label": "Spacer tray"
+  },
+  {
+   "id": "gear_tray",
+   "kind": "box",
+   "center": [
+    450,
+    -640,
+    5
+   ],
+   "size": [
+    120,
+    120,
+    10
+   ],
+   "color": "#ffe0c4",
+   "label": "Gear tray"
+  }
+ ],
+ "objects": [
+  {
+   "id": "spacer",
+   "kind": "spacer",
+   "shape": "box",
+   "size": [
+    50,
+    50,
+    20
+   ],
+   "position": [
+    450,
+    640,
+    10
+   ],
+   "color": "blue"
+  },
+  {
+   "id": "gear",
+   "kind": "gear",
+   "shape": "cylinder",
+   "size": [
+    56,
+    56,
+    30
+   ],
+   "position": [
+    450,
+    -640,
+    10
+   ],
+   "color": "red"
+  },
+  {
+   "id": "propeller",
+   "kind": "propeller",
+   "shape": "box",
+   "size": [
+    40,
+    360,
+    20
+   ],
+   "position": [
+    680,
+    0,
+    0
+   ],
+   "color": "green",
+   "twoHanded": true
+  }
+ ],
+ "regions": [
+  {
+   "id": "pedestal_top",
+   "center": [
+    450,
+    0,
+    70
+   ],
+   "size": [
+    90,
+    90,
+    40
+   ],
+   "label": "Pedestal"
+  }
+ ],
+ "io": {
+  "inputs": [],
+  "outputs": []
+ },
+ "conveyors": [],
+ "sceneTargets": {},
+ "robots": [
+  {
+   "id": "A",
+   "label": "Left arm",
+   "armId": "gofa-like",
+   "base": {
+    "x": 0,
+    "y": 400,
+    "z": 0,
+    "rz": 0
+   },
+   "color": "#1a8cff",
+   "targets": {
+    "spacer.above": {
+     "x": 450,
+     "y": 240,
+     "z": 150,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "spacer": {
+     "x": 450,
+     "y": 240,
+     "z": 20,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "stack.above": {
+     "x": 450,
+     "y": -400,
+     "z": 221,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "spacer.set": {
+     "x": 450,
+     "y": -400,
+     "z": 71,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "prop.above": {
+     "x": 680,
+     "y": -260,
+     "z": 150,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "prop": {
+     "x": 680,
+     "y": -260,
+     "z": 10,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "prop.lift": {
+     "x": 680,
+     "y": -260,
+     "z": 220,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "prop.over": {
+     "x": 450,
+     "y": -260,
+     "z": 220,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "prop.set": {
+     "x": 450,
+     "y": -260,
+     "z": 121,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "ready": {
+     "x": 450,
+     "y": 0,
+     "z": 300,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    }
+   }
+  },
+  {
+   "id": "B",
+   "label": "Right arm",
+   "armId": "gofa-like",
+   "base": {
+    "x": 0,
+    "y": -400,
+    "z": 0,
+    "rz": 0
+   },
+   "color": "#ff8a2a",
+   "targets": {
+    "gear.above": {
+     "x": 450,
+     "y": -240,
+     "z": 155,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "gear": {
+     "x": 450,
+     "y": -240,
+     "z": 25,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "stack.above": {
+     "x": 450,
+     "y": 400,
+     "z": 226,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "gear.set": {
+     "x": 450,
+     "y": 400,
+     "z": 96,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "prop.above": {
+     "x": 680,
+     "y": 260,
+     "z": 150,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "prop": {
+     "x": 680,
+     "y": 260,
+     "z": 10,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    },
+    "ready": {
+     "x": 450,
+     "y": 0,
+     "z": 300,
+     "rx": 180,
+     "ry": 0,
+     "rz": 0
+    }
+   }
+  }
+ ],
+ "camera": {
+  "position": [
+   -1250,
+   -150,
+   2650
+  ],
+  "target": [
+   480,
+   0,
+   0
+  ]
+ }
+}

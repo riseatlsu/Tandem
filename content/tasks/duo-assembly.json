@@ -1,0 +1,49 @@
+{
+ "id": "duo-assembly",
+ "title": "Assembly",
+ "sceneId": "duo-assembly",
+ "seed": 1,
+ "editor": "blocks",
+ "passOn": "run",
+ "brief": "Build the stack on the pedestal: **spacer**, then **gear** on top, then the **propeller** on top of that.\n\n- Only the **left arm** reaches the spacer, and only the **right arm** reaches the gear.\n- The propeller is too wide for one gripper: grip it with **both** arms (`prop`), then carry it with **Move together**: `prop.lift`, `prop.over`, `prop.set`.\n\nThe parts must go on in order, so the arms take turns at the pedestal.",
+ "predicates": [
+  {
+   "type": "objectInRegion",
+   "object": "spacer",
+   "region": "pedestal_top",
+   "label": "Spacer on the pedestal"
+  },
+  {
+   "type": "objectOn",
+   "object": "gear",
+   "on": "spacer",
+   "label": "Gear on the spacer"
+  },
+  {
+   "type": "objectOn",
+   "object": "propeller",
+   "on": "gear",
+   "label": "Propeller on the gear"
+  },
+  {
+   "type": "upright",
+   "object": "propeller",
+   "label": "Propeller lies flat"
+  },
+  {
+   "type": "noArmCollisions"
+  },
+  {
+   "type": "programCompleted"
+  }
+ ],
+ "hints": [
+  "The right arm can pick up the gear while the left arm places the spacer. Wait for each other before it reaches the pedestal.",
+  "Close both grippers on the propeller, then Wait for each other, then Move together. Opening one gripper lets the propeller go."
+ ],
+ "timeLimitSec": 1800,
+ "demo": {
+  "order": 120
+ },
+ "difficulty": 3
+}

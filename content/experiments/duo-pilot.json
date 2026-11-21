@@ -1,0 +1,13 @@
+{
+  "id": "duo-pilot",
+  "version": "1",
+  "conditions": {
+    "suggest": { "agent": { "mode": "suggest", "model": "gpt-5-mini", "promptVersion": "sys-v4", "features": { "visuals": false, "plans": false, "preview": false } }, "taskSequence": ["duo-tutorial", "duo-handover", "duo-assembly"] },
+    "qa": { "agent": { "mode": "qa", "model": "gpt-5-mini", "promptVersion": "sys-v4", "features": { "visuals": false, "plans": false, "preview": false } }, "taskSequence": ["duo-tutorial", "duo-handover", "duo-assembly"] },
+    "off": { "agent": { "mode": "off", "promptVersion": "sys-v4" }, "taskSequence": ["duo-tutorial", "duo-handover", "duo-assembly"] }
+  },
+  "assignment": "byCode",
+  "counterbalance": { "method": "latinSquare", "over": "taskSequence", "fixedPrefix": 1 },
+  "postSurveyUrl": "https://example.org/post-survey",
+  "logging": { "telemetry": true, "snapshotDebounceMs": 2000 }
+}

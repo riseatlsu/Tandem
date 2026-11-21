@@ -2,7 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { Scene3D } from '../view/Scene3D';
 import { SimCore } from '../sim/SimCore';
-import { ARMS, TASKS, sceneForTask } from '../content';
+import { TASKS, robotsFor, sceneForTask } from '../content';
 import { runHeadless } from '../runtime/headless';
 import binThree from '../../tests/fixtures/solutions/factory-bin-three.js?raw';
 import sortColors from '../../tests/fixtures/solutions/sort-colors.js?raw';
@@ -27,7 +27,8 @@ export function HeroCell({ onScene }: { onScene?: (title: string) => void }) {
       for (let k = 0; !stopped; k++) {
         const show = SHOWS[k % SHOWS.length];
         const task = TASKS[show.task];
-        const run = new SimCore(sceneForTask(task), ARMS[task.armId], { seed: task.seed + k });
+        const scene = sceneForTask(task);
+        const run = new SimCore(scene, robotsFor(scene, task.armId), { seed: task.seed + k });
         sim = run;
         onScene?.(run.scene.title);
         let wall = performance.now(), simT = 0, lastYield = performance.now();

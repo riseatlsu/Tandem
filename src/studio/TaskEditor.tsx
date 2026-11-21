@@ -1,9 +1,10 @@
 /** Studio: build a task on an environment — brief, goals, starter program, demo listing, and a tested reference solution. */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ARMS, SCENES, TASKS, TaskZ, sceneForTask, type TaskDef } from '../content';
+import { ARMS, SCENES, TASKS, TaskZ, robotsFor, sceneForTask, type TaskDef } from '../content';
 import type { PredicateDef, Target } from '../sim/types';
 import { SimCore } from '../sim/SimCore';
-import { runHeadless } from '../runtime/headless';
+import { runHeadless, splitLanes } from '../runtime/headless';
+import { validateSteps, type Step, type StepEnv } from '../blocks/steps';
 import { hashString, type RunTrace } from '../runtime/protocol';
 import { evaluate } from '../sim/predicates/evaluators';
 import { Preview, type PreviewHandle } from './Preview';
@@ -25,9 +26,32 @@ const GOALS: Record<PredicateDef['type'], { title: string; params: Param[] }> = 
   simTimeBelow: { title: 'Finishes within a cycle time', params: [{ k: 'sec', label: 'Seconds', kind: 'num' }] },
   programCompleted: { title: 'The program runs to the end', params: [] },
   targetTaught: { title: 'A position is taught by hand', params: [{ k: 'name', label: 'Position name', kind: 'text' }] },
-  holding: { title: 'The gripper holds a part', params: [{ k: 'object', label: 'Part (any if empty)', kind: 'object', optional: true }] },
+  holding: { title: 'The gripper holds a part', params: [{ k: 'object', label: 'Part (any if empty)', kind: 'object', optional: true }, { k: 'robot', label: 'Arm id (multi-arm, any if empty)', kind: 'text', optional: true }] },
+  objectOn: { title: 'A part sits on another part', params: [{ k: 'object', label: 'Part', kind: 'object' }, { k: 'on', label: 'On top of', kind: 'object' }, { k: 'tolMm', label: 'Tolerance (mm)', kind: 'num', optional: true }] },
+  handedOver: { title: 'A part is handed from one arm to another', params: [{ k: 'object', label: 'Part', kind: 'object' }, { k: 'from', label: 'From arm id', kind: 'text' }, { k: 'to', label: 'To arm id', kind: 'text' }] },
+  noArmCollisions: { title: 'The arms never collide', params: [] },
 };
 const COLORS = ['red', 'green', 'blue', 'yellow', 'orange', 'purple', 'white', 'black'];
+
+/** Starter block program as JSON steps: a partial program to finish, or a complete one with bugs to fix. */
+function StarterSteps({ value, env, onChange }: { value: Step[] | undefined; env: StepEnv; onChange(v: Step[] | undefined): void }) {
+  const [text, setText] = useState(() => (value ? JSON.stringify(value, null, 1) : ''));
+  const [err, setErr] = useState<string | null>(null);
+  const commit = (t: string) => {
+    if (!t.trim()) { setErr(null); onChange(undefined); return; }
+    try {
+      const v = JSON.parse(t);
+      const errs = validateSteps(v, env);
+      if (errs.length) { setErr(errs.slice(0, 3).join(' · ')); return; }
+      setErr(null); onChange(v as Step[]);
+    } catch (e) { setErr((e as Error).message); }
+  };
+  return (
+    <Field label="Starter blocks (optional)" wide hint={err ?? 'The program the user starts with, as JSON steps, e.g. [{ "home": true }, { "move": "pick.approach" }]. Give a partial program to finish, or a complete one with bugs to fix (say how many in the brief). Leave empty for an empty program.'}>
+      <Area mono rows={value ? 8 : 3} value={text} onChange={(t) => { setText(t); commit(t); }} />
+    </Field>
+  );
+}
 
 export function newTask(id: string): TaskDef {
   const sceneId = Object.keys(SCENES)[0];
@@ -59,19 +83,25 @@ export function TaskEditor({ sourceId, onSaved }: { sourceId: string | null; onS
   const objects = scene?.objects.map((o) => o.id) ?? [];
   const regions = scene?.regions.map((r) => r.id) ?? [];
   const kinds = [...new Set([...(scene?.objects.map((o) => o.kind) ?? []), ...(scene?.conveyors.map((c) => c.spawn.kind) ?? [])])];
-  const posNames = scene ? [...Object.keys(scene.sceneTargets), ...Object.keys(d.presetTargets ?? {})] : [];
+  const multi = !!scene?.robots;
+  const posNames = scene
+    ? multi ? [...new Set(scene.robots!.flatMap((r) => Object.keys(r.targets ?? {})))] : [...Object.keys(scene.sceneTargets), ...Object.keys(d.presetTargets ?? {})]
+    : [];
 
   const runTest = async () => {
     if (!scene || !arm) return;
     setBusy(true);
-    const sim = new SimCore(structuredClone(scene), arm, { seed: d.seed });
+    const sc = structuredClone(scene);
+    const sim = new SimCore(sc, robotsFor(sc, arm.id), { seed: d.seed });
     sim.setTargets(targets);
-    const trace = await runHeadless(sim, solution, { predicates: d.predicates, seed: d.seed, maxSimTimeSec: d.maxSimTimeSec ?? 600 });
+    const trace = await runHeadless(sim, splitLanes(solution), { predicates: d.predicates, seed: d.seed, maxSimTimeSec: d.maxSimTimeSec ?? 600 });
     setTest({ hash, trace });
     setBusy(false);
   };
   const save = async () => {
     const clean = tidy({ ...d, hints: d.hints?.filter(Boolean) });
+    // multi-arm tasks take their arms from the scene; the loader fills armId in memory only
+    if (multi) delete (clean as { armId?: string }).armId;
     const r = TaskZ.safeParse(clean);
     const errs = r.success ? [] : r.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`);
     if (!d.predicates.length) errs.push('Add at least one goal.');
@@ -108,12 +138,15 @@ export function TaskEditor({ sourceId, onSaved }: { sourceId: string | null; onS
         <Field label="Title"><Text value={d.title} onChange={(v) => up((t) => { t.title = v; })} /></Field>
         <Field label="Brief" hint="Markdown: **bold**, `code`, - lists" wide><Area rows={6} value={d.brief} onChange={(v) => up((t) => { t.brief = v; })} /></Field>
         <Field label="Environment"><Select value={d.sceneId} onChange={(v) => up((t) => { t.sceneId = v; t.predicates = []; })} options={Object.values(SCENES).map((s) => ({ value: s.id, label: s.title }))} /></Field>
-        <Field label="Robot"><Select value={d.armId} onChange={(v) => up((t) => { t.armId = v; })} options={Object.values(ARMS).map((a) => ({ value: a.id, label: a.name }))} /></Field>
+        {multi
+          ? <Field label="Robots"><span className="st-help">{scene!.robots!.map((r) => `${r.label} (${ARMS[r.armId]?.name ?? r.armId})`).join(' + ')} — set in the environment</span></Field>
+          : <Field label="Robot"><Select value={d.armId} onChange={(v) => up((t) => { t.armId = v; })} options={Object.values(ARMS).map((a) => ({ value: a.id, label: a.name }))} /></Field>}
         <Field label="Programming with"><Select value={d.editor} onChange={(v) => up((t) => { t.editor = v; })} options={[{ value: 'blocks', label: 'Blocks' }, { value: 'code', label: 'JavaScript' }]} /></Field>
         <Field label="Task passes when"><Select value={d.passOn} onChange={(v) => up((t) => { t.passOn = v; })} options={[{ value: 'run', label: 'a program run meets every goal' }, { value: 'live', label: 'the goals are met at any moment (e.g. by jogging)' }]} /></Field>
         {d.editor === 'code'
           ? <Field label="Starter code" wide><Area mono rows={6} value={d.starter?.code} onChange={(v) => up((t) => { t.starter = v ? { code: v } : undefined; })} /></Field>
-          : <Check label="Start with a “Go home” block" value={!!d.starter?.blocks?.length} onChange={(v) => up((t) => { t.starter = v ? { blocks: [{ type: 'robot_home' }] } : undefined; })} />}
+          : <StarterSteps value={d.starter?.steps as Step[] | undefined ?? (d.starter?.blocks?.length ? [{ home: true }] : undefined)} env={{ targets: posNames, inputs: scene?.io.inputs.map((i) => i.name) ?? [], outputs: scene?.io.outputs.map((o) => o.name) ?? [] }}
+              onChange={(v) => up((t) => { t.starter = v ? { steps: v } : undefined; })} />}
         <Field label="Hints (one per line, revealed one at a time)" wide><Area rows={3} value={(d.hints ?? []).join('\n')} onChange={(v) => up((t) => { t.hints = v.split('\n'); })} /></Field>
         <Field label="Time limit in a study (s)" hint="empty = no limit"><Num value={d.timeLimitSec} onChange={(v) => up((t) => { t.timeLimitSec = v; })} /></Field>
         <Field label="Random seed" hint="changes conveyor color order"><Num value={d.seed} onChange={(v) => up((t) => { t.seed = v ?? 1; })} /></Field>
@@ -163,7 +196,9 @@ export function TaskEditor({ sourceId, onSaved }: { sourceId: string | null; onS
         {scene && d.predicates.length > 0 && <LiveGoals scene={scene} task={d} />}
 
         <h3>Reference solution</h3>
-        <p className="st-help">JavaScript that solves the task. It proves the task is possible and keeps working as Tandem changes (it runs in the unit tests). Named positions: {posNames.join(', ') || 'none yet'}.</p>
+        <p className="st-help">JavaScript that solves the task. It proves the task is possible and keeps working as Tandem changes (it runs in the unit tests). {multi
+          ? <>Multi-arm: start each arm&apos;s program with a line <code>// @lane A</code>, <code>// @lane B</code>, … and coordinate with <code>await sync()</code>, <code>robot.moveTogether(target)</code> / <code>robot.follow()</code>. Positions per arm: {scene!.robots!.map((r) => `${r.id}: ${Object.keys(r.targets ?? {}).join(', ') || 'none'}`).join(' · ')}.</>
+          : <>Named positions: {posNames.join(', ') || 'none yet'}.</>}</p>
         {d.passOn === 'live' && <Check label="No solution — this task is passed by hand (e.g. teaching a position)" value={noSolution} onChange={setNoSolution} />}
         {!noSolution && (
           <>
@@ -203,7 +238,8 @@ function LiveGoals({ scene, task }: { scene: NonNullable<ReturnType<typeof scene
   const res = useMemo(() => {
     try {
       const arm = ARMS[task.armId]; if (!arm) return [];
-      const sim = new SimCore(structuredClone(scene), arm, { seed: task.seed });
+      const sc = structuredClone(scene);
+      const sim = new SimCore(sc, robotsFor(sc, arm.id), { seed: task.seed });
       return task.predicates.map((p) => evaluate(p, sim.s, { scene, targets: sim.allTargets(), programCompleted: false, runStartTime: 0, runFaults: 0, totalLiquid: sim.s.totalLiquid }));
     } catch (e) { return [{ label: `Goal error: ${(e as Error).message}`, pass: false }]; }
   }, [scene, task]);
@@ -218,6 +254,7 @@ function defaultGoal(type: PredicateDef['type'], objects: string[], regions: str
     upright: { type: 'upright', object: o }, fillAtLeast: { type: 'fillAtLeast', object: o, frac: 0.6 }, spilledAtMost: { type: 'spilledAtMost', frac: 0.1 },
     noFaults: { type: 'noFaults' }, simTimeBelow: { type: 'simTimeBelow', sec: 60 }, programCompleted: { type: 'programCompleted' },
     targetTaught: { type: 'targetTaught', name: 'P1' }, holding: { type: 'holding' },
+    objectOn: { type: 'objectOn', object: o, on: objects[1] ?? o }, handedOver: { type: 'handedOver', object: o, from: 'A', to: 'B' }, noArmCollisions: { type: 'noArmCollisions' },
   };
   return m[type];
 }

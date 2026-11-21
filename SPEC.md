@@ -54,7 +54,7 @@ These decisions were made while building v1. They take precedence over the secti
   - feature showcase with recorded clips, a level gallery that opens `?demo=<taskId>`, and a rotating robot lineup;
   - a music toggle that is **off by default**.
   `?demo[=taskId]` opens the app and `&tour` starts the tour. `?code=` / `?study` go straight to the study gate and never show the landing page. There is no code box on the landing page; participants use their link. The demo top-bar logo links back home.
-- **AI-partner features are per-condition flags** (`conditions.<c>.agent.features: { visuals, plans, preview }`, anything omitted is off; all on in the demo). They are recorded in `StudyInfo.features` and gate both the tools and the prompt section (`sys-v3`).
+- **AI-partner features are per-condition flags** (`conditions.<c>.agent.features: { visuals, plans, preview }`, anything omitted is off; all on in the demo). They are recorded in `StudyInfo.features` and gate both the tools and the prompt section (`sys-v4`).
   - `visuals`: `show_blocks` draws a read-only Blockly picture of JSON steps in the chat (untaught targets allowed). `show_example` plays a curated GIF from `src/agent/clips.ts`.
   - `plans`: `make_plan` pins a 3–7 step checklist. Steps carry optional checks (`target`, `uses`, `screen`, `holding`, `run`, `goal`) that tick themselves from live state every 300 ms; the user ticks the others. Ticks are sticky and plans are checkpointed.
   - `preview` (suggest only): `preview_proposal` and a "Show me" button on proposal cards. They dry-run the proposal from the robot's current pose with motion recording (`recordEvery`) and replay it on a translucent ghost arm in the cell view; the real robot never moves.
@@ -469,7 +469,7 @@ interface TaskDef {
   id: string; title: string; brief: string;          // markdown shown to user and agent
   sceneId: string; armId: string; seed: number;
   editor: 'blocks' | 'code';
-  starter?: { code?: string; blocksJson?: object };
+  starter?: { code?: string; steps?: Step[] };       // steps: a block program (JSON steps) to finish or to fix
   presetTargets?: Record<string, Pose>;              // targets given to the user up front
   predicates: PredicateDef[];                         // all must pass at program completion
   maxSimTimeSec?: number; timeLimitSec?: number;     // timeLimitSec = wall-clock study limit
@@ -478,6 +478,13 @@ interface TaskDef {
 ```
 
 At least 2 tasks per scene (6 total), plus 2 tutorial tasks (`tut-jog-teach`, `tut-first-program`).
+
+**Every demo task is a blocks task.** The former JavaScript tasks start from a block program instead:
+- `factory-bin-three` "Finish the loop": the loop waits for a part and goes down to it; the user adds grab, lift, drop.
+- `palletize-2x2x2` "Fix the palletizer": a complete program with three bugs (one layer instead of two; rows shifted by the column counter; the move down ignores the layer height).
+- `kitchen-pour` "Fix the pour": a complete program with two bugs (the gripper never closes; it stays tipped too briefly to fill the cup). Task presets `pour.start` / `pour.tilt` stand in for the computed tilt pose.
+
+`tests/unit/starters.test.ts` checks that each starter fails, the intended fix passes, and each listed bug fails on its own. A starter is saved to the workspace as soon as the editor loads it, so the AI partner, checkpoints and logs see it. `stackPattern` requires rows × cols separate grid spots per layer and nothing above the top layer (it used to count cubes per layer only, so wrong grids passed). Because task 3 of the pilot changed, the pilot experiment's `version` went to 3.
 
 ### 11.3 Predicates (`src/sim/predicates/registry.ts`)
 `objectInRegion(objId|kind, regionId, tolMm)` · `allOfKindInRegion(kind, regionId)` · `sortedByColor(map: color→regionId)` · `stackPattern(regionId, rows, cols, layers, tolMm)` · `upright(objId)` · `fillAtLeast(objId, frac)` · `spilledAtMost(frac)` · `noFaults()` · `simTimeBelow(sec)` · `programCompleted()`.
@@ -666,7 +673,7 @@ A checkpoint is written to `checkpoint/current` (and IndexedDB) on every `progra
 - Rigid-body physics, dynamics, torques, payload effects, and objects colliding with each other (a dropped object stacks only by the support-surface rule)
 - Self-collision checking, and collision-free path planning (moves are point-to-point; collisions fault rather than being avoided)
 - Cobot safety features: speed and separation monitoring, safety zones, human avatars, ISO/TS 15066 force limits
-- Blend and zone radii (fine points only), circular moves (moveC), conveyor tracking, external axes, multiple robots
+- Blend and zone radii (fine points only), circular moves (moveC), conveyor tracking, external axes (multiple robots in one cell: now designed in §21)
 - JS→blocks conversion, Python, and any RAPID/URScript-style DSL
 - Viewport screenshots or vision input for the agent
 - Objects as obstacles: the arm collides only with fixtures, not with loose parts or containers
@@ -747,3 +754,140 @@ A checkpoint is written to `checkpoint/current` (and IndexedDB) on every `progra
 2. With a real OpenAI model, ask the agent to "write a program that sorts the parts by color" in `palletize-sort` (code mode). It dry-runs, proposes a diff, and after Apply and Run all predicates pass (allowing ≤2 follow-up turns).
 3. Generate 2 real codes with `npm run codes:gen`. Complete one study session end to end on a lab machine, with Wi-Fi toggled off for 30 s mid-task. Export the logs and confirm no `seq` gaps and that the session matches what was done.
 4. Set `config/llm.enabled=false` in the console → the agent shows the disabled message within one request, and the sim stays usable.
+
+---
+
+## 21. Multi-arm tasks (Duplo-style cooperative programming)
+
+> Status: **built** (sim, runtime, block lanes, pendant, four tasks, code mode, AI partner, logging, Studio). Tests: `tests/unit/multiarm.test.ts`, `tests/e2e/multiarm.spec.ts`. Where the build differs from the first draft, the text below describes the build (§21.11 lists the changes). Based on Fronchetti et al., *Block-based Programming for Two-Armed Robots: A Comparative Study* (ICSE '24, `refs/`), which introduced **Duplo**. Tandem copies Duplo's programming approach: **one program per arm, shown side by side, with cross-canvas sync blocks that stay vertically aligned**. It generalizes from Duplo's one two-armed robot to **N independent arms in one cell**. Everything in §1–§20 still holds for single-arm tasks; a task is multi-arm only when its scene defines `robots`.
+
+### 21.1 Decisions
+
+| # | Topic | Decision |
+|---|---|---|
+| D1 | Physical setup | **Separate single-arm cobots in one cell**, each with its own base pose and any existing arm model. No dual-arm torso model. |
+| D2 | Arm count | **N arms** in the data model, sim, runtime and agent. The UI is designed and tested for **2**, and lanes scroll horizontally for 3–4. Sync blocks always span **all** arms. |
+| D3 | Synced moves | **Shared grasp, rigid carry.** A `twoHanded` part lifts only when every arm holding it is in the same synced move. The leader moves to its target in a straight line; followers keep their grasp offset to the leader, so the part moves rigidly. |
+| D4 | Layout | **Wide pendant** on multi-arm tasks (the cell view shrinks) so the Program screen shows the lanes side by side. Jog and Positions get an arm picker. |
+| D5 | Code mode | **One JS program per arm**, side by side, matching the blocks one to one: `sync()` and `robot.moveTogether(target)` / `robot.follow()`. |
+| D6 | AI partner | **Full support**: per-arm JSON steps, dry run, propose, show_blocks and ghost preview. The prompt becomes `sys-v4`. |
+| D7 | First tasks | Two-arm tutorial, Handover, Parallel throughput, and a Duplo assembly replica (spacer, gear, two-handed propeller). |
+| D8 | Arm-vs-arm safety | **Full pre-check over time.** Before any motion starts, its timed path is checked against every other arm's committed timed path. On a predicted hit, nothing moves, and the fault names both arms' blocks. |
+| D9 | Availability | **Demo levels** (after the single-arm levels) **and Studio experiments**, with per-arm study logging. |
+| D10 | Run controls | **Global pause; Step is per arm.** Step advances one command on every arm that has one ready. Each lane highlights its own running block; an arm parked at a sync shows a "Waiting for others" badge. |
+| D11 | Positions | **Per-arm lists** (A: P1, P2…; B: P1…) in each arm's base frame. **Teach all arms** saves one name for every arm at once (ROY's "current position from both arms"), used by synced moves. |
+| D12 | Alignment | **Strict Duplo alignment.** Dropping a sync block in one lane inserts its twin in every lane. Deleting one copy deletes all; moving a copy within its lane moves only that copy, unless it changes its order among the lane's sync blocks (then its twins are re-placed to keep the order). The editor pads lanes so twins sit on the same row, and the lanes scroll together. |
+
+### 21.2 Content model
+- **Scene:** an optional `robots: [{ id: "A", label: "Left arm", armId, base: { x, y, z, rz }, color?, targets? }]`. The base is planar (mm, yaw in degrees about world Z), which keeps fixture boxes yaw-only in every arm's frame. When `robots` is present, the task's `armId` and the scene's `sceneTargets` are not used. Ids match `^[A-Z][A-Za-z0-9]*$` (`A`, `B`, …), and labels are what users see. Lane, arm-tint and badge colors come from `color`.
+- **Scene targets** are per arm, in `robots[i].targets`, in that arm's **base frame** (the coordinates its Jog readouts show). A target meant for two arms (e.g. `prop.lift`) is defined once per arm. `robotsFor(scene, armId)` in `src/content/index.ts` turns a scene into SimCore's `RobotSetup[]`; single-arm scenes become one robot `A` with an identity base and `sceneTargets`.
+- **Objects** gain `twoHanded?: boolean`. A two-handed part rises only in a synced move where every holder is part of the move.
+- **Task:** single-arm tasks keep `armId`. Multi-arm tasks may not set `armId` (the loader fills it with the first robot's arm so existing code keeps working), and the Settings "Robot arm" override is hidden for them. `editor` defaults to blocks.
+- **Workspace** (per task): `lanes: { [robotId]: { blocks?: BlocklyState; code?: string; targets: Record<string, Target> } }` instead of one program and one target list. Checkpoints and resume store the same shape.
+- **Zod** (`src/content/index.ts`) and Studio enforce: unique robot ids; known arm models; multi-arm tasks don't set `armId`; a reference solution exists in `tests/fixtures/solutions/<task>.js`. Multi-arm solutions start each arm's program with a line `// @lane <robotId>` (`splitLanes` / `joinLanes` in `src/runtime/headless.ts`). Studio's scene editor has an "Arms" JSON field (validated with the same schema), and the task editor runs `@lane` solutions and strips the loader-filled `armId` on save.
+- **Conveyor spawns** may set `cycle: true` to take `colors` in order (red, blue, red, …) instead of drawing them from the seeded rng.
+
+### 21.3 Simulation (`src/sim/`, still pure and deterministic)
+- **State.** `SimState.robots: Record<RobotId, RobotState>`, each with `q`, `gripperOpen`, `holding`, `active` and taught `targets` (base frame). Single-arm scenes are one robot `A`, so there's one code path. SimCore's single-arm methods (`tcp()`, `tcpPose()`, `setJoints()`, `allTargets()`, `rs()` …) take an optional robot id that defaults to the first robot; `stepAll()` advances every arm and returns per-robot events, and `step()` remains as the single-robot wrapper.
+- **Clock.** The §6.1 rule generalizes to: *sim time advances only while at least one arm is executing a command and every other live arm is executing, blocked at a sync, waiting on I/O, or finished.* An arm whose program is computing between commands holds the clock. This makes interleaving independent of worker timing, so the determinism test still compares full `RunTrace` JSON.
+- **Commands** carry `robot: RobotId`. `begin()` plans and pre-checks one arm's command at the current sim time, and `step(dt)` advances every active command.
+- **Arm-vs-arm pre-check (D8).** Every committed motion is stored as a timed capsule track (sampled every 10 ms). A new motion's track is checked against:
+  - the remaining tracks of other moving arms;
+  - the current pose of stationary arms (capsules plus any held part);
+  - for the rest of the run, as later moves commit.
+  A predicted hit raises `ARM_COLLISION` with `detail: { arms: [a, b], atSimTime, links }`. Neither arm starts, and running arms stop at the current instant. The fault card names both blocks.
+- **Self-collision** stays out of scope (§17). Arms check against fixtures, each other, and parts held by other arms.
+- **Sync wait.** `{ op: 'sync', kind: 'wait' }` parks the arm until **every** arm's program has parked at its next sync. The *k*-th sync in each program pairs with the *k*-th sync in every other. A program that has already finished can never reach a sync, so a sync reached after any arm finished is a `SYNC_MISMATCH`.
+- **Synced move.** The leader sends `{ op: 'sync', kind: 'move', target, speed }`; followers send `{ op: 'sync', kind: 'follow' }`. The scheduler pairs them by position and calls `SimCore.beginSync(leader, …, followers)`. Once all have arrived:
+  - The leader plans a moveL. Each follower's TCP path is `leaderTcp(t) · offsetᵢ`, where `offsetᵢ` is frozen at the start, and IK runs every 2 mm on each.
+  - All arms are pre-checked together (reach, limits, singularity, fixtures, each other), then move in lockstep.
+  - A follower whose path fails raises the fault on its own block.
+- **Two-handed grasp.** Closing a gripper on a `twoHanded` part adds that arm to the part's holder set (a holder is any arm whose `holding` names the part); the part stays put until it moves in a synced move with all its holders. Two-handed parts, and parts another arm already holds, can be gripped anywhere along their footprint; every other grasp keeps the original center rule, so single-arm behavior is unchanged.
+  - Moving one holder alone raises `SHARED_GRASP` ("both arms are holding the propeller — use Move together").
+  - Opening one gripper while the part is lifted drops it.
+  - Single-arm pick on a two-handed part raises `NEEDS_TWO_HANDS` on the first lift attempt.
+  - **Handover** is a re-grasp: arm B closes on a part arm A holds (top-down grasps can't meet at one point), then A opens. That records `{from: A, to: B}` on the part for the `handedOver` predicate. While both hold an ordinary part, neither can move alone (`SHARED_GRASP`).
+  - Grippers may touch parts another arm holds, as with any loose part; arm links may not (`ARM_COLLISION`). Two grippers closed on the same part are not checked against each other.
+- **Deadlock.** If every live arm is parked or finished but a sync can't complete (an arm finished, or the counts differ), the run stops with `SYNC_MISMATCH`. The message names the lane that is missing a sync, and each waiting arm's sync block is highlighted.
+- **Faults** add `ARM_COLLISION`, `SHARED_GRASP`, `NEEDS_TWO_HANDS` and `SYNC_MISMATCH` to §6.2's table. All are pre-checks, like the existing ones.
+- **Predicates** gain an optional `robot` (`holding`, `targetTaught`) and add `objectOn {object, on}` (stacked within tolerance), `handedOver {object, from, to}` (the part was held by `from` and then by `to` without touching a support in between) and `noArmCollisions`.
+
+### 21.4 Runtime
+- **One worker per run** hosts every lane's program, one per arm, started together (`start { lanes: [{ robot, src, targets }] }`; calls and errors carry `lane`). `src/runtime/scheduler.ts` decides when calls begin and when time advances under the §21.3 clock rule; `ProgramRunner` (live) and `runHeadless` (dry runs, tests, landing) share it, and `runHeadless` accepts a string (first robot) or `{ [robotId]: src }`. Same sandbox, runaway guard and line attribution as today; in multi-arm runs each lane's `sourceURL` is `user-program-<robotId>.js` so stack frames tell the lanes apart.
+- **`robotApi.ts`** stays the single API implementation, now built per robot. `headless.ts` (dry runs, tests, landing hero) runs the same multi-lane scheduler.
+- **Code-mode API (D5)**, per lane:
+  - `robot.*`, `gripper.*`, `io.*`, `targets.*` as in §7, bound to that arm;
+  - `await sync()`, i.e. Wait for each other;
+  - `await robot.moveTogether(target, opts?)` (leader) and `await robot.follow()` (every other lane), both at the same sync position.
+  `targets` resolves in that arm's list.
+- **Run controls (D10).** Pause freezes the clock and holds every arm's next reply. Step releases one command on each arm with one ready, then pauses again; arms parked at a sync stay parked. Stop ends all lanes. The status light reflects the whole cell.
+- **Trace.** `RunTrace` entries gain `robot`, and sync completions are logged as `{ op: 'sync', seq, simTime }`.
+
+### 21.5 Programming surface
+- **Lanes.** The Program screen shows **one Blockly workspace with a column per arm** (`src/blocks/lanes.ts`), so blocks drag between lanes natively, one toolbox serves every lane, and lanes share scroll and zoom. Each lane starts with a non-movable `lane_start` hat colored like its arm ("Left arm · When Run is pressed"); the layout re-spaces columns to fit their widest stack. Code is generated per lane (`lanesCode`). The Blocks/JavaScript toggle shows every lane's JS.
+- **Block set.** All existing blocks work unchanged inside a lane; target and I/O dropdowns list that arm's positions. A new **Together** category holds the two cross-lane blocks:
+  - **Wait for each other.** Inserted into every lane at the same row; each copy shows a link icon.
+  - **Move together to [target], others follow.** The leader copy names a target from the leader's list; every other lane's twin reads "Follow [Left arm]". Dragging the block into a lane makes that lane the leader. Swapping leaders is a dropdown on any copy.
+- **Twin behavior (D12).** Twin maintenance emits no Blockly events (events are delivered asynchronously, so our own changes would come back looking like user edits); the editor's save listener runs after it for the same user event, and undoing the user's action removes or restores twins through the same listener.
+  - Twins share a `syncId`, and editing, moving or deleting any copy applies to all of them, in one Blockly event group (one undo step).
+  - A sync block can't go inside a loop or if (the drop is refused, with a tooltip), because counts must match across lanes. Code mode reports the same rule as `SYNC_MISMATCH` at runtime.
+  - Disabling or detaching a copy detaches all its twins.
+- **Alignment.** After every change, an async layout pass sets the height of a spacer row at the top of each sync block (a spacer row has a minimum height, so when a row needs padding every twin in it shows one, each sized by measure-and-correct). The *k*-th sync row then ends at the same y in every lane. The padded part of a block shows a dashed line and "waiting": it is time that arm spends waiting. The pass suppresses events only around its own synchronous changes, so edits made while it waits for rendering are never lost.
+- **Leader.** A copy dragged into another lane, or a new block, leads; moving a Follow copy within its lane keeps the current leader. Right-click a Follow copy → "Lead the move from this arm" to swap leaders (the leader keeps its target name if that arm has it).
+- **Code mode** shows one Monaco editor per lane, side by side, with lane headers. The typings (`editor/robotApiDts.ts`) add `sync`, `moveTogether` and `follow`. Blocks compile one way to the per-lane JS.
+- **Highlighting.** Each lane highlights its own running block or line. A parked sync block shows "Waiting for others". A synced move highlights every twin row at once.
+
+### 21.6 Pendant and cell view
+- **Wide pendant (D4).** On multi-arm tasks the pendant's default width grows to fit the lanes (about 2 × 360 px plus the toolbox), using the existing resizable split with a higher minimum. The cell view keeps at least 360 px.
+- **Arm picker.** A segmented control with arm labels and colors appears at the top of Jog and Positions (`src/pendant/ArmPicker.tsx`, store `arm`). Jog, hand guide, gripper, Go home and Teach act on the picked arm. Clicking an arm in the cell view also picks it (`Scene3D.pickArm`). The I/O app has no picker: signals are shared by every arm.
+- **Lane status.** A strip at the top of the Program screen shows each arm's state during a run: Moving, Running, Waiting for others, Finished (store `laneStates`, from the scheduler).
+- **Teach all arms** on the Positions and Jog screens saves the next free shared name (`T1`, `T2`…, or one you type) as a position in every arm's list at each arm's current pose.
+- **Cell view.** Each arm gets a subtle tint ring at its base in its lane color, plus a floating label. The fault card for `ARM_COLLISION` highlights both arms' colliding links in red at the predicted instant (shown as a frozen ghost).
+- **Home** shows "2 arms" on the task card. The dock is unchanged.
+
+### 21.7 AI partner (D6)
+- **Steps JSON** for multi-arm tasks: `{ "lanes": { "A": [ ...steps ], "B": [ ...steps ] } }`. Lane steps add `{ "sync": "wait" }`, `{ "sync": "move", "target": "lift", "speed"?: n }` (leader) and `{ "sync": "follow" }`. The validator checks that every lane has the same sequence of sync kinds, that exactly one lane leads each synced move, that no syncs sit inside loops, and that targets exist in the right arm's list.
+- **Tools.**
+  - `read_program`, `dry_run`, `propose_patch` and `preview_proposal` take and return the lanes shape. Ghost preview replays every arm.
+  - `read_sim_state` and `read_task` report per-robot state and per-arm targets.
+  - `show_blocks` draws lanes side by side with aligned syncs.
+  - `make_plan` checks gain `robot` (`target`, `holding`).
+- **Prompt `sys-v4`** adds a multi-arm section, appended only on multi-arm tasks so single-arm conditions keep identical wording otherwise. It covers the lanes format, sync semantics, two-handed parts and common faults (`ARM_COLLISION` → add a Wait for each other; `SHARED_GRASP` → use Move together).
+- **Docs and clips.** `content/docs/multi-arm.md`, a Two-arm section in `pendant-apps.md`, and new GIFs `sync-wait`, `move-together` and `teach-all-arms` (`scripts/record-clips.ts`).
+- **Mock LLM** gets a multi-arm scenario in `tests/fixtures/mock-llm/scenarios.json`.
+
+### 21.8 Study logging
+Events that concern an arm gain `robot` (`jog`, `teach`, `target_*`, block edits, `run_*` trace entries, faults). New events: `sync_block_add` / `sync_block_remove` (`syncId`, `kind`, `leader`), `lane_focus` (`robot`), `teach_all`. Block snapshots store the lanes shape. Old single-arm sessions export unchanged.
+
+### 21.9 Tasks (D7), each with a reference solution and Studio-editable scene
+All four use two GoFa-class arms side by side, 800 mm apart, both facing +X (`Left arm` = A at y +400, blue; `Right arm` = B at y −400, orange), viewed from behind and above. The scenes are generated from world coordinates (each arm's targets converted to its base frame).
+1. **`duo-tutorial` — Two hands** (`duo-bench`). Left carries a block to the middle pad and leaves; Right waits (Wait for each other), moves the block to the right pad; both go to `ready`, then one Move together to `ready.low`. Goals: block on the right pad, no arm collisions, program completes, no faults. Without the syncs the right arm reaches the empty pad too early.
+2. **`duo-handover` — Handover** (`duo-handover`). Only Left reaches the infeed, only Right the outfeed. Left holds a 300 mm bar at `give`; Right re-grasps its other end at `take`; Left opens; Right places it. Three Wait for each other. Goals: `handedOver(bar, A, B)`, bar on the outfeed, no arm collisions, program completes. Moving Right before Left lets go is a SHARED_GRASP.
+3. **`duo-throughput` — Two at the conveyor** (`duo-conveyor`). Six parts, colors cycling red/blue; each arm loops 3× waiting for its color (`part_color`), picks, drops in its own bin and returns to `ready`. No syncs (they can't go in loops); the colors decide turns. Goals: 3 red in the left bin, 3 blue in the right bin, no arm collisions, program completes.
+4. **`duo-assembly` — Assembly** (`duo-assembly`; after Fronchetti et al., original geometry). Spacer (only Left reaches it) on the pedestal, gear (only Right) on the spacer, then the two-handed propeller gripped by both and carried with Move together (`prop.lift`, `prop.over`, `prop.set`). Goals: spacer on the pedestal, `objectOn(gear, spacer)`, `objectOn(propeller, gear)`, propeller flat, no arm collisions, program completes. One arm alone on the propeller is a NEEDS_TWO_HANDS.
+- **Study.** `content/experiments/duo-pilot.json` sequences the three coordinated tasks; local test codes accept an experiment suffix (`TEST-SUGGEST-1-DUO-PILOT`).
+
+### 21.10 Acceptance (adds to §20.1, all automated)
+- Unit:
+  - clock rule determinism (same `RunTrace` for the same seed across 50 runs with random worker delays);
+  - arm-vs-arm pre-check catches crossing paths and stationary-arm hits;
+  - synced move keeps the grasp offset within 0.5 mm;
+  - `SHARED_GRASP`, `NEEDS_TWO_HANDS` and `SYNC_MISMATCH` cases;
+  - steps lanes validator;
+  - twin insert, move and delete keep alignment (Blockly headless).
+- Every `duo-*` reference solution passes headless.
+- E2E:
+  - build a two-lane program by dragging, check twins and row alignment, Run, and see both lanes highlight and a "Waiting for others" badge;
+  - Pause/Step semantics;
+  - an agent proposal on `duo-handover` via the mock LLM, with ghost preview of both arms;
+  - a study session with a `duo-*` task logs `robot` on events.
+
+### 21.11 Changes from the first draft
+- One Blockly workspace with a column per arm instead of separate workspaces (native drag between lanes, one toolbox, shared scroll).
+- Moving a sync copy within its lane moves only that copy (D12); leader swap is a context-menu item, not a dropdown.
+- Padding shows as a taller block with a dashed "waiting" line, not blank space; no row band.
+- Arm bases are planar (x, y, z, yaw); per-arm targets live in `robots[i].targets`, not a keyed `sceneTargets`.
+- Handovers are re-grasps; grippers may touch parts another arm holds; a sync reached after any arm finished is a SYNC_MISMATCH.
+- No arm picker on the I/O app (signals are shared); Studio edits arms as JSON rather than with base gizmos.
+- `duo-throughput` coordinates by color (`cycle` spawns) instead of syncs, because syncs can't go inside loops.
+- The AI partner's multi-arm tool parameters (`programs`, `lanes`) and prompt section are added only on multi-arm tasks, so single-arm tool schemas and prompt text are unchanged (`sys-v4`).
